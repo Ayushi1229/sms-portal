@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Alerts: "Alerts - SMMS",
+  title: "Alerts - SMMS",
 };
 
 export default function AlertsPage() {
