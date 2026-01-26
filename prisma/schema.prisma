@@ -1,0 +1,495 @@
+// Prisma schema for Student Mentoring Management System (SMMS)
+// Database: MySQL (MySQLWorkbench)
+// Migration path: Designed to be portable to PostgreSQL if needed
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// INSTITUTIONAL STRUCTURE
+// ============================================================================
+
+model Institution {
+  id            String       @id @default(uuid())
+  name          String       @db.VarChar(255)
+  code          String       @unique @db.VarChar(50)
+  address       String?      @db.Text
+  contactEmail  String?      @db.VarChar(255)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  departments   Department[]
+  users         User[]
+
+  @@map("institutions")
+}
+
+model Department {
+  id             String       @id @default(uuid())
+  institutionId  String
+  name           String       @db.VarChar(255)
+  code           String       @db.VarChar(50)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  institution    Institution  @relation(fields: [institutionId], references: [id], onDelete: Cascade)
+  users          User[]
+  mentorAssignments MentorAssignment[]
+
+  @@unique([institutionId, code])
+  @@index([institutionId])
+  @@map("departments")
+}
+
+// ============================================================================
+// USER MANAGEMENT & RBAC
+// ============================================================================
+
+model Role {
+  id          Int        @id @default(autoincrement())
+  name        String     @unique @db.VarChar(50)
+  description String?    @db.Text
+  createdAt   DateTime   @default(now())
+
+  users       User[]
+
+  @@map("roles")
+}
+
+model User {
+  id             String       @id @default(uuid())
+  institutionId  String?
+  departmentId   String?
+  roleId         Int
+  email          String       @unique @db.VarChar(255)
+  passwordHash   String       @db.VarChar(255)
+  status         UserStatus   @default(INVITED)
+  lastLoginAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  institution    Institution?  @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  department     Department?   @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  role           Role          @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  
+  profile        UserProfile?
+  mentorProfile  MentorProfile?
+  studentProfile StudentProfile?
+
+  mentorAssignments     MentorAssignment[] @relation("MentorAssignments")
+  studentAssignments    MentorAssignment[] @relation("StudentAssignments")
+  assignmentsCreated    MentorAssignment[] @relation("AssignmentCreator")
+  
+  sessionsCreated       SessionRecord[]    @relation("SessionCreator")
+  feedbackGiven         SessionFeedback[]  @relation("FeedbackGiver")
+  feedbackReceived      SessionFeedback[]  @relation("FeedbackRecipient")
+  
+  goalsCreated          Goal[]             @relation("GoalCreator")
+  goalsOwned            Goal[]             @relation("StudentGoals")
+  goalUpdates           GoalUpdate[]
+  
+  notifications         Notification[]
+  alerts                Alert[]            @relation("StudentAlerts")
+  alertsClosed          Alert[]            @relation("AlertCloser")
+  
+  attachments           Attachment[]
+  auditLogs             AuditLog[]
+  passwordResets        PasswordReset[]
+
+  @@index([email])
+  @@index([roleId])
+  @@index([departmentId])
+  @@index([institutionId])
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  DISABLED
+  INVITED
+}
+
+model UserProfile {
+  userId      String    @id
+  firstName   String    @db.VarChar(100)
+  lastName    String    @db.VarChar(100)
+  phone       String?   @db.VarChar(20)
+  avatarUrl   String?   @db.VarChar(500)
+  title       String?   @db.VarChar(100)
+  bio         String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model MentorProfile {
+  userId             String              @id
+  designation        String?             @db.VarChar(100)
+  specialization     String?             @db.VarChar(255)
+  capacityDefault    Int                 @default(10)
+  availabilityStatus AvailabilityStatus  @default(AVAILABLE)
+  maxMentees         Int                 @default(15)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  user               User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("mentor_profiles")
+}
+
+enum AvailabilityStatus {
+  AVAILABLE
+  LIMITED
+  UNAVAILABLE
+}
+
+model StudentProfile {
+  userId         String     @id
+  rollNumber     String     @db.VarChar(50)
+  program        String?    @db.VarChar(100)
+  yearOfStudy    Int?
+  gpa            Decimal?   @db.Decimal(4, 2)
+  attendancePct  Decimal?   @db.Decimal(5, 2)
+  riskLevel      RiskLevel  @default(LOW)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([rollNumber])
+  @@map("student_profiles")
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// ============================================================================
+// MENTOR-MENTEE ASSIGNMENTS
+// ============================================================================
+
+model MentorAssignment {
+  id           String              @id @default(uuid())
+  mentorId     String
+  studentId    String
+  departmentId String
+  assignedById String
+  status       AssignmentStatus    @default(ACTIVE)
+  assignedAt   DateTime            @default(now())
+  endedAt      DateTime?
+  notes        String?             @db.Text
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  mentor       User                @relation("MentorAssignments", fields: [mentorId], references: [id], onDelete: Restrict)
+  student      User                @relation("StudentAssignments", fields: [studentId], references: [id], onDelete: Restrict)
+  department   Department          @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  assignedBy   User                @relation("AssignmentCreator", fields: [assignedById], references: [id], onDelete: Restrict)
+
+  sessions     SessionRecord[]
+  attachments  Attachment[]
+
+  @@index([mentorId, status])
+  @@index([studentId, status])
+  @@index([departmentId])
+  @@map("mentor_assignments")
+}
+
+enum AssignmentStatus {
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+// ============================================================================
+// MENTORING SESSIONS
+// ============================================================================
+
+model SessionRecord {
+  id             String         @id @default(uuid())
+  assignmentId   String
+  sessionDate    DateTime
+  mode           SessionMode
+  location       String?        @db.VarChar(255)
+  topic          String         @db.VarChar(500)
+  summary        String?        @db.Text
+  actionItems    Json?
+  nextMeetingOn  DateTime?
+  attendance     Attendance     @default(PRESENT)
+  status         SessionStatus  @default(SCHEDULED)
+  createdById    String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  assignment     MentorAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  createdBy      User             @relation("SessionCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  feedback       SessionFeedback[]
+  attachments    Attachment[]
+
+  @@index([assignmentId, sessionDate])
+  @@index([status])
+  @@index([sessionDate])
+  @@map("session_records")
+}
+
+enum SessionMode {
+  IN_PERSON
+  ONLINE
+  PHONE
+}
+
+enum Attendance {
+  PRESENT
+  ABSENT
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+// ============================================================================
+// FEEDBACK SYSTEM
+// ============================================================================
+
+model SessionFeedback {
+  id              String            @id @default(uuid())
+  sessionId       String
+  giverUserId     String
+  recipientUserId String
+  type            FeedbackType
+  rating          Int               // 1-5
+  comments        String?           @db.Text
+  visibility      FeedbackVisibility @default(MENTOR)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  session         SessionRecord     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  giver           User              @relation("FeedbackGiver", fields: [giverUserId], references: [id], onDelete: Restrict)
+  recipient       User              @relation("FeedbackRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  attachments     Attachment[]
+
+  @@index([sessionId])
+  @@index([recipientUserId])
+  @@map("session_feedback")
+}
+
+enum FeedbackType {
+  MENTOR_TO_STUDENT
+  STUDENT_TO_MENTOR
+}
+
+enum FeedbackVisibility {
+  MENTOR
+  STUDENT
+  DEPARTMENT_ADMIN
+}
+
+// ============================================================================
+// GOALS & PROGRESS TRACKING
+// ============================================================================
+
+model Goal {
+  id          String      @id @default(uuid())
+  studentId   String
+  title       String      @db.VarChar(255)
+  category    GoalCategory
+  description String?     @db.Text
+  targetDate  DateTime?
+  status      GoalStatus  @default(NOT_STARTED)
+  progressPct Int         @default(0)
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  student     User        @relation("StudentGoals", fields: [studentId], references: [id], onDelete: Cascade)
+  createdBy   User        @relation("GoalCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  updates     GoalUpdate[]
+  attachments Attachment[]
+
+  @@index([studentId, status])
+  @@index([targetDate])
+  @@map("goals")
+}
+
+enum GoalCategory {
+  ACADEMIC
+  BEHAVIORAL
+  CAREER
+  WELLNESS
+}
+
+enum GoalStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  AT_RISK
+  COMPLETED
+}
+
+model GoalUpdate {
+  id          String      @id @default(uuid())
+  goalId      String
+  notedById   String
+  note        String      @db.Text
+  progressPct Int
+  status      GoalStatus
+  createdAt   DateTime    @default(now())
+
+  goal        Goal        @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  notedBy     User        @relation(fields: [notedById], references: [id], onDelete: Restrict)
+
+  @@index([goalId])
+  @@map("goal_updates")
+}
+
+// ============================================================================
+// ATTACHMENTS & FILE MANAGEMENT
+// ============================================================================
+
+// ...existing code...
+model Attachment {
+  id           String   @id @default(cuid())
+  filename     String
+  url          String
+  mimeType     String?
+  sizeBytes    Int?
+  relatedType  AttachmentRelatedType?
+  sessionId    String?
+  feedbackId   String?
+  goalId       String?
+  assignmentId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  session     SessionRecord?    @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "attachments_session_fkey")
+  feedback    SessionFeedback?  @relation(fields: [feedbackId], references: [id], onDelete: Cascade, map: "attachments_feedback_fkey")
+  goal        Goal?             @relation(fields: [goalId], references: [id], onDelete: Cascade, map: "attachments_goal_fkey")
+  assignment  MentorAssignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade, map: "attachments_assignment_fkey")
+}
+// ...existing code...
+
+enum RelatedType {
+  SESSION
+  FEEDBACK
+  GOAL
+  ASSIGNMENT
+}
+
+// ============================================================================
+// NOTIFICATIONS & ALERTS
+// ============================================================================
+
+model Notification {
+  id        String            @id @default(uuid())
+  userId    String
+  type      NotificationType
+  title     String            @db.VarChar(255)
+  body      String            @db.Text
+  payload   Json?
+  readAt    DateTime?
+  createdAt DateTime          @default(now())
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  SESSION_REMINDER
+  GOAL_DUE
+  ALERT
+  ASSIGNMENT
+  FEEDBACK
+}
+
+model Alert {
+  id         String        @id @default(uuid())
+  studentId  String
+  severity   AlertSeverity
+  category   AlertCategory
+  message    String        @db.Text
+  sourceRef  Json?
+  status     AlertStatus   @default(OPEN)
+  createdAt  DateTime      @default(now())
+  closedAt   DateTime?
+  closedById String?
+
+  student    User          @relation("StudentAlerts", fields: [studentId], references: [id], onDelete: Cascade)
+  closedBy   User?         @relation("AlertCloser", fields: [closedById], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@index([severity, status])
+  @@map("alerts")
+}
+
+enum AlertSeverity {
+  INFO
+  WARN
+  CRITICAL
+}
+
+enum AlertCategory {
+  ATTENDANCE
+  GPA
+  BEHAVIOR
+  GRIEVANCE
+}
+
+enum AlertStatus {
+  OPEN
+  CLOSED
+}
+
+// ============================================================================
+// AUDIT & SECURITY
+// ============================================================================
+
+model AuditLog {
+  id           BigInt    @id @default(autoincrement())
+  userId       String?
+  action       String    @db.VarChar(100)
+  entity       String    @db.VarChar(100)
+  entityId     String?   @db.VarChar(255)
+  beforeState  Json?
+  afterState   Json?
+  ip           String?   @db.VarChar(50)
+  userAgent    String?   @db.VarChar(500)
+  createdAt    DateTime  @default(now())
+
+  user         User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model PasswordReset {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @db.VarChar(255)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_resets")
+}
