@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Department Summary: "Department Summary - SMMS",
+  title: "Department Summary - SMMS",
 };
 
 export default function DepartmentSummaryPage() {

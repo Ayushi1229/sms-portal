@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Mentor Load Report: "Mentor Load Report - SMMS",
+  title: "Mentor Load Report - SMMS",
 };
 
 export default function MentorLoadReportPage() {

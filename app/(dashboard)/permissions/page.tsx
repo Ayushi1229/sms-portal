@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Permissions: "Permissions - SMMS",
+  title: "Permissions - SMMS",
 };
 
 export default function PermissionsPage() {

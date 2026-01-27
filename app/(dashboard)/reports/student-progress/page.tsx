@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Student Progress Report: "Student Progress Report - SMMS",
+  title: "Student Progress Report - SMMS",
 };
 
 export default function StudentProgressReportPage() {

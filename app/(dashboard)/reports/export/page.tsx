@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Export Reports: "Export Reports - SMMS",
+  title: "Export Reports - SMMS",
 };
 
 export default function ExportReportsPage() {

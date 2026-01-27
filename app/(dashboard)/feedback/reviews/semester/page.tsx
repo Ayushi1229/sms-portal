@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Semester Reviews: "Semester Reviews - SMMS",
+  title: "Semester Reviews - SMMS",
 };
 
 export default function SemesterReviewsPage() {

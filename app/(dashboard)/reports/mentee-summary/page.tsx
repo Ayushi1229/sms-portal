@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Mentee Summary Report: "Mentee Summary Report - SMMS",
+  title: "Mentee Summary Report - SMMS",
 };
 
 export default function MenteeSummaryReportPage() {

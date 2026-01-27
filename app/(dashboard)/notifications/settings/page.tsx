@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Notification Settings: "Notification Settings - SMMS",
+  title: "Notification Settings - SMMS",
 };
 
 export default function NotificationSettingsPage() {

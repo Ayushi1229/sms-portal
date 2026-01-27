@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Pending Sessions: "Pending Sessions - SMMS",
+  title: "Pending Sessions - SMMS",
 };
 
 export default function PendingSessionsPage() {

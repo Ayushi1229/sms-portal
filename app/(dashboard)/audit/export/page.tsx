@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Export Audit Logs: "Export Audit Logs - SMMS",
+  title: "Export Audit Logs - SMMS",
 };
 
 export default function ExportAuditLogsPage() {

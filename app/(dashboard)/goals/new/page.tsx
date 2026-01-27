@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  New Goal: "New Goal - SMMS",
+  title: "New Goal - SMMS",
 };
 
 export default function NewGoalPage() {

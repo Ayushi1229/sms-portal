@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Upload File: "Upload File - SMMS",
+  title: "Upload File - SMMS",
 };
 
 export default function UploadFilePage() {

@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Add Institution: "Add Institution - SMMS",
+  title: "Add Institution - SMMS",
 };
 
 export default function NewInstitutionPage() {

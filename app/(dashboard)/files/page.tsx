@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Files: "Files - SMMS",
+  title: "Files - SMMS",
 };
 
 export default function FilesPage() {

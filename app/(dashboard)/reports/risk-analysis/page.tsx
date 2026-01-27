@@ -1,7 +1,7 @@
 ﻿import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  Risk Analysis: "Risk Analysis - SMMS",
+  title: "Risk Analysis - SMMS",
 };
 
 export default function RiskAnalysisPage() {
