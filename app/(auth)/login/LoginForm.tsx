@@ -12,13 +12,13 @@ export default function LoginForm() {
   };
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit}>
+    <form className="space-y-4" onSubmit={handleSubmit}>
       <div>
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-slate-700"
+          className="block text-sm font-medium text-gray-700 mb-1"
         >
-          Email address
+          Email
         </label>
         <input
           id="email"
@@ -26,23 +26,23 @@ export default function LoginForm() {
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
         />
       </div>
 
       <div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-1">
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-slate-700"
+            className="block text-sm font-medium text-gray-700"
           >
             Password
           </label>
           <Link
             href="/forgot-password"
-            className="text-sm text-slate-600 hover:text-slate-900"
+            className="text-xs text-blue-600 hover:text-blue-700 transition"
           >
-            Forgot password?
+            Forgot?
           </Link>
         </div>
         <input
@@ -51,30 +51,19 @@ export default function LoginForm() {
           type="password"
           autoComplete="current-password"
           placeholder="••••••••"
-          className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus:border-slate-900 focus:ring-2 focus:ring-slate-200"
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
         />
       </div>
 
-      <div className="flex items-center justify-between text-sm">
-        <label className="flex items-center gap-2 text-slate-600">
-          <input
-            type="checkbox"
-            name="remember"
-            className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-200"
-          />
-          Keep me signed in
-        </label>
-      </div>
-
-      <p className="text-xs text-slate-500">
-        Development mode: any email and password will work.
+      <p className="text-xs text-gray-500 pt-2">
+        Demo: Use any email and password
       </p>
 
       <button
         type="submit"
-        className="w-full rounded-md bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900"
+        className="w-full mt-6 bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition duration-200"
       >
-        Sign in
+        Sign In
       </button>
     </form>
   );

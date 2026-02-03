@@ -11,7 +11,6 @@ export default function ResetPasswordPage() {
       <p className="text-gray-600 mb-4">
         Enter your new password
       </p>
-      {/* Form will be added in Week 4-5 */}
-    </div>
+\    </div>
   );
 }

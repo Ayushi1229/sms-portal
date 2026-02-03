@@ -11,7 +11,7 @@ export default function UserDetailPage({ params }: { params: { id: string } }) {
       <p className="text-gray-600 mb-4">User ID: {params.id}</p>
       
       <div className="bg-white rounded-lg shadow p-6">
-        <p className="text-gray-600">User profile details will be displayed here in Week 4-5</p>
+        <p className="text-gray-600">User profile details</p>
       </div>
     </div>
   );

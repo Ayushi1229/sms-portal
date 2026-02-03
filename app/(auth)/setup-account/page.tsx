@@ -11,7 +11,6 @@ export default function SetupAccountPage() {
       <p className="text-gray-600 mb-4">
         Complete your profile and set a password
       </p>
-      {/* Form will be added in Week 4-5 */}
     </div>
   );
 }

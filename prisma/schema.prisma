@@ -366,7 +366,8 @@ model Attachment {
   url          String
   mimeType     String?
   sizeBytes    Int?
-  relatedType  AttachmentRelatedType?
+  relatedType  RelatedType?
+  userId       String?
   sessionId    String?
   feedbackId   String?
   goalId       String?
@@ -374,6 +375,7 @@ model Attachment {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  user        User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
   session     SessionRecord?    @relation(fields: [sessionId], references: [id], onDelete: Cascade, map: "attachments_session_fkey")
   feedback    SessionFeedback?  @relation(fields: [feedbackId], references: [id], onDelete: Cascade, map: "attachments_feedback_fkey")
   goal        Goal?             @relation(fields: [goalId], references: [id], onDelete: Cascade, map: "attachments_goal_fkey")

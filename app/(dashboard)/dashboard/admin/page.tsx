@@ -31,7 +31,6 @@ export default function AdminDashboardPage() {
       
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <p className="text-gray-600">Activity feed will be implemented in Week 4-5</p>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ export default function RegisterPage() {
       <p className="text-gray-600 mb-4">
         Admin-initiated registration for new users
       </p>
-      {/* Form will be added in Week 4-5 */}
+     
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -18,8 +18,9 @@ export async function GET(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     const student = await prisma.studentProfile.findUnique({
-      where: { userId: params.id },
+      where: { userId: id },
       include: {
         user: {
           include: {
@@ -28,34 +29,6 @@ export async function GET(
             institution: true,
           },
         },
-        mentor: {
-          include: {
-            user: {
-              include: {
-                profile: true,
-              },
-            },
-          },
-        },
-        assignments: {
-          include: {
-            mentor: {
-              include: {
-                user: {
-                  include: {
-                    profile: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { assignedAt: 'desc' },
-          take: 5,
-        },
-        goals: {
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
       },
     });
 
@@ -63,16 +36,43 @@ export async function GET(
       return apiError('Student not found', 404);
     }
 
+    // Get assignments
+    const assignments = await prisma.mentorAssignment.findMany({
+      where: {
+        studentId: id,
+      },
+      include: {
+        mentor: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+      orderBy: { assignedAt: 'desc' },
+      take: 5,
+    });
+
+    // Get goals
+    const goals = await prisma.goal.findMany({
+      where: {
+        studentId: id,
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+    });
+
     return NextResponse.json(
-      apiResponse(student),
+      apiResponse({
+        ...student,
+        assignments,
+        goals,
+      }),
       { status: 200 }
     );
 
   } catch (error: any) {
     console.error('Get student error:', error);
     return apiError('Failed to fetch student', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -82,7 +82,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -90,37 +90,39 @@ export async function PUT(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
+
     const body = await request.json();
     const {
       firstName,
       lastName,
-      phoneNumber,
-      batch,
-      semester,
-      cgpa,
-      guardianName,
-      guardianContact,
+      phone,
+      rollNumber,
+      program,
+      yearOfStudy,
+      gpa,
+      attendancePct,
       riskLevel,
     } = body;
 
     // Update user profile and student profile
     const updatedStudent = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         profile: {
           update: {
             firstName,
             lastName,
-            phoneNumber,
+            phone,
           },
         },
         studentProfile: {
           update: {
-            batch,
-            semester,
-            cgpa: cgpa ? parseFloat(cgpa) : undefined,
-            guardianName,
-            guardianContact,
+            rollNumber,
+            program,
+            yearOfStudy: yearOfStudy ? parseInt(yearOfStudy) : undefined,
+            gpa: gpa ? parseFloat(gpa) : undefined,
+            attendancePct: attendancePct ? parseFloat(attendancePct) : undefined,
             riskLevel,
           },
         },
@@ -143,18 +145,16 @@ export async function PUT(
   } catch (error: any) {
     console.error('Update student error:', error);
     return apiError('Failed to update student', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
 /**
  * DELETE /api/students/[id]
- * Delete student (soft delete by setting status to INACTIVE)
+ * Delete student (soft delete by setting status to DISABLED)
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -162,10 +162,11 @@ export async function DELETE(
       return apiError('Unauthorized', 401);
     }
 
-    // Soft delete - set status to INACTIVE
+    const { id } = await params;
+    // Soft delete - set status to DISABLED
     await prisma.user.update({
-      where: { id: params.id },
-      data: { status: 'INACTIVE' },
+      where: { id },
+      data: { status: 'DISABLED' },
     });
 
     return NextResponse.json(
@@ -176,7 +177,5 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Delete student error:', error);
     return apiError('Failed to delete student', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }

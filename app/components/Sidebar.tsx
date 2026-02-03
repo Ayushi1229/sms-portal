@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-// This will be dynamic based on user role in Week 7 (Authentication)
 const menuItems = [
   {
     section: "Dashboard",

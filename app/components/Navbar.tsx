@@ -19,15 +19,12 @@ export default function Navbar() {
 
         {/* Right side actions */}
         <div className="flex items-center space-x-4">
-          {/* Search - Will be implemented in Week 4 */}
           <div className="text-sm text-gray-400">🔍 Search</div>
           
-          {/* Notifications - Will be implemented in Week 4 */}
           <Link href="/notifications" className="text-gray-600 hover:text-gray-900">
             🔔 <span className="text-xs bg-red-500 text-white px-1 rounded-full">3</span>
           </Link>
           
-          {/* User Profile - Will be implemented in Week 4 */}
           <div className="text-sm text-gray-600">
             👤 User Profile
           </div>

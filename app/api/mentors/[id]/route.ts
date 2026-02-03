@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -18,52 +18,15 @@ export async function GET(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     const mentor = await prisma.mentorProfile.findUnique({
-      where: { userId: params.id },
+      where: { userId: id },
       include: {
         user: {
           include: {
             profile: true,
             department: true,
             institution: true,
-          },
-        },
-        assignments: {
-          include: {
-            student: {
-              include: {
-                user: {
-                  include: {
-                    profile: true,
-                  },
-                },
-              },
-            },
-          },
-          where: {
-            status: 'ACTIVE',
-          },
-          orderBy: { assignedAt: 'desc' },
-        },
-        sessions: {
-          include: {
-            student: {
-              include: {
-                user: {
-                  include: {
-                    profile: true,
-                  },
-                },
-              },
-            },
-          },
-          orderBy: { scheduledAt: 'desc' },
-          take: 10,
-        },
-        _count: {
-          select: {
-            assignments: true,
-            sessions: true,
           },
         },
       },
@@ -73,16 +36,43 @@ export async function GET(
       return apiError('Mentor not found', 404);
     }
 
+    // Get assignments count
+    const assignmentsCount = await prisma.mentorAssignment.count({
+      where: {
+        mentorId: id,
+        status: 'ACTIVE',
+      },
+    });
+
+    // Get recent assignments
+    const assignments = await prisma.mentorAssignment.findMany({
+      where: {
+        mentorId: id,
+        status: 'ACTIVE',
+      },
+      include: {
+        student: {
+          include: {
+            profile: true,
+          },
+        },
+      },
+      orderBy: { assignedAt: 'desc' },
+      take: 10,
+    });
+
     return NextResponse.json(
-      apiResponse(mentor),
+      apiResponse({
+        ...mentor,
+        assignmentsCount,
+        assignments,
+      }),
       { status: 200 }
     );
 
   } catch (error: any) {
     console.error('Get mentor error:', error);
     return apiError('Failed to fetch mentor', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -92,7 +82,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -100,36 +90,33 @@ export async function PUT(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     const body = await request.json();
     const {
       firstName,
       lastName,
-      phoneNumber,
+      phone,
       designation,
-      qualification,
       specialization,
-      experience,
       maxMentees,
       availabilityStatus,
     } = body;
 
     // Update user profile and mentor profile
     const updatedMentor = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         profile: {
           update: {
             firstName,
             lastName,
-            phoneNumber,
+            phone,
           },
         },
         mentorProfile: {
           update: {
             designation,
-            qualification,
             specialization,
-            experience: experience ? parseInt(experience) : undefined,
             maxMentees: maxMentees ? parseInt(maxMentees) : undefined,
             availabilityStatus,
           },
@@ -153,8 +140,6 @@ export async function PUT(
   } catch (error: any) {
     console.error('Update mentor error:', error);
     return apiError('Failed to update mentor', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -164,7 +149,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -172,10 +157,11 @@ export async function DELETE(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     // Check if mentor has active assignments
     const activeAssignments = await prisma.mentorAssignment.count({
       where: {
-        mentorId: params.id,
+        mentorId: id,
         status: 'ACTIVE',
       },
     });
@@ -186,8 +172,8 @@ export async function DELETE(
 
     // Soft delete
     await prisma.user.update({
-      where: { id: params.id },
-      data: { status: 'INACTIVE' },
+      where: { id },
+      data: { status: 'DISABLED' },
     });
 
     return NextResponse.json(
@@ -198,7 +184,5 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Delete mentor error:', error);
     return apiError('Failed to delete mentor', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }

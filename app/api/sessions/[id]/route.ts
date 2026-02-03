@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -18,31 +18,38 @@ export async function GET(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     const session = await prisma.sessionRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
-        mentor: {
+        assignment: {
           include: {
-            user: {
+            mentor: {
               include: {
                 profile: true,
-                department: true,
               },
             },
+            student: {
+              include: {
+                profile: true,
+              },
+            },
+            department: true,
           },
         },
-        student: {
+        createdBy: {
           include: {
-            user: {
-              include: {
-                profile: true,
-              },
-            },
+            profile: true,
           },
         },
         feedback: {
           include: {
-            user: {
+            giver: {
+              include: {
+                profile: true,
+              },
+            },
+            recipient: {
               include: {
                 profile: true,
               },
@@ -65,8 +72,6 @@ export async function GET(
   } catch (error: any) {
     console.error('Get session error:', error);
     return apiError('Failed to fetch session', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -76,7 +81,7 @@ export async function GET(
  */
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -84,27 +89,24 @@ export async function PUT(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
+
     const body = await request.json();
     const {
-      scheduledAt,
-      duration,
+      sessionDate,
       mode,
       location,
-      agenda,
-      meetingLink,
+      topic,
+      summary,
+      actionItems,
+      nextMeetingOn,
       status,
       attendance,
-      actualStartTime,
-      actualEndTime,
-      summary,
-      discussionPoints,
-      actionItems,
-      nextSteps,
     } = body;
 
     // Check if session exists
     const existingSession = await prisma.sessionRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingSession) {
@@ -113,40 +115,36 @@ export async function PUT(
 
     // Update session
     const updatedSession = await prisma.sessionRecord.update({
-      where: { id: params.id },
+      where: { id },
       data: {
-        scheduledAt: scheduledAt ? new Date(scheduledAt) : undefined,
-        duration,
+        sessionDate: sessionDate ? new Date(sessionDate) : undefined,
         mode,
         location,
-        agenda,
-        meetingLink,
+        topic,
+        summary,
+        actionItems,
+        nextMeetingOn: nextMeetingOn ? new Date(nextMeetingOn) : undefined,
         status,
         attendance,
-        actualStartTime: actualStartTime ? new Date(actualStartTime) : undefined,
-        actualEndTime: actualEndTime ? new Date(actualEndTime) : undefined,
-        summary,
-        discussionPoints,
-        actionItems,
-        nextSteps,
       },
       include: {
-        mentor: {
+        assignment: {
           include: {
-            user: {
+            mentor: {
+              include: {
+                profile: true,
+              },
+            },
+            student: {
               include: {
                 profile: true,
               },
             },
           },
         },
-        student: {
+        createdBy: {
           include: {
-            user: {
-              include: {
-                profile: true,
-              },
-            },
+            profile: true,
           },
         },
       },
@@ -163,8 +161,6 @@ export async function PUT(
   } catch (error: any) {
     console.error('Update session error:', error);
     return apiError('Failed to update session', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -174,7 +170,7 @@ export async function PUT(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const token = verifyToken(request);
@@ -182,9 +178,10 @@ export async function DELETE(
       return apiError('Unauthorized', 401);
     }
 
+    const { id } = await params;
     // Check if session exists
     const session = await prisma.sessionRecord.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!session) {
@@ -198,7 +195,7 @@ export async function DELETE(
 
     // Update status to cancelled instead of hard delete
     await prisma.sessionRecord.update({
-      where: { id: params.id },
+      where: { id },
       data: { status: 'CANCELLED' },
     });
 
@@ -210,7 +207,5 @@ export async function DELETE(
   } catch (error: any) {
     console.error('Delete session error:', error);
     return apiError('Failed to delete session', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }
