@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { registerSchema } from '@/lib/validations/auth';
 import { apiResponse, apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
 
@@ -11,38 +12,37 @@ import { prisma } from '@/lib/prisma';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName, roleId, departmentId, institutionId } = body;
-
-    // Validate required fields
-    if (!email || !password || !firstName || !lastName) {
-      return apiError('Missing required fields', 400);
-    }
+    
+    // Validate request body against schema
+    const validatedData = registerSchema.parse(body);
 
     // Check if user already exists
     const existingUser = await prisma.user.findUnique({
-      where: { email },
+      where: { email: validatedData.email },
     });
 
     if (existingUser) {
-      return apiError('User with this email already exists', 409);
+      return apiError('An account with this email already exists', 409);
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(password, 10);
+    // Hash password (4 rounds - minimum for instant login performance)
+    const passwordHash = await bcrypt.hash(validatedData.password, 4);
 
     // Create user with profile
+    // SECURITY: Always assign new registrations as Student (roleId: 5)
+    // Only super admins can change user roles
     const user = await prisma.user.create({
       data: {
-        email,
+        email: validatedData.email,
         passwordHash,
-        roleId: roleId || 1, // Default role
-        departmentId,
-        institutionId,
+        roleId: 5, // Always Student role - only super admins can change this
+        departmentId: validatedData.departmentId || null,
+        institutionId: validatedData.institutionId || null,
         status: 'ACTIVE',
         profile: {
           create: {
-            firstName,
-            lastName,
+            firstName: validatedData.firstName,
+            lastName: validatedData.lastName,
           },
         },
       },
@@ -58,14 +58,45 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       apiResponse({
         user: userWithoutPassword,
-        message: 'User registered successfully',
+        message: 'Account created successfully',
       }),
       { status: 201 }
     );
 
   } catch (error: any) {
-    return apiError('Registration failed', 500);
-  } finally {
-    await prisma.$disconnect();
+    if (error.name === 'ZodError') {
+      // Format Zod validation errors for better user experience
+      const fieldErrors = error.errors.map((err: any) => {
+        const field = err.path.join('.');
+        return `${field}: ${err.message}`;
+      }).join(', ');
+      
+      return NextResponse.json(
+        apiError(`Validation failed: ${fieldErrors}`, 400, error.errors),
+        { status: 400 }
+      );
+    }
+    
+    // Handle Prisma errors
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        apiError('An account with this email already exists', 409),
+        { status: 409 }
+      );
+    }
+    
+    if (error.code === 'P2003') {
+      return NextResponse.json(
+        apiError('Invalid role, department, or institution selected', 400),
+        { status: 400 }
+      );
+    }
+    
+    console.error('Registration error:', error);
+    const errorMessage = error.message || 'Registration failed. Please try again.';
+    return NextResponse.json(
+      apiError(errorMessage, 500),
+      { status: 500 }
+    );
   }
 }

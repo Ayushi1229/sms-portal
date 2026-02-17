@@ -13,7 +13,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = verifyToken(request);
+    const token = await verifyToken(request);
     if (!token) {
       return apiError('Unauthorized', 401);
     }
@@ -85,7 +85,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = verifyToken(request);
+    const token = await verifyToken(request);
     if (!token) {
       return apiError('Unauthorized', 401);
     }
@@ -152,7 +152,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const token = verifyToken(request);
+    const token = await verifyToken(request);
     if (!token) {
       return apiError('Unauthorized', 401);
     }

@@ -64,23 +64,26 @@ export default function EditUserForm() {
           lastName: user.profile?.lastName || '',
           status: user.status,
           roleId: user.roleId,
-          departmentId: user.departmentId,
+          departmentId: user.departmentId || '',
         });
 
-        // Set hardcoded roles and departments
-        setRoles([
-          { id: 1, name: 'super_admin' },
-          { id: 2, name: 'institutional_admin' },
-          { id: 3, name: 'department_admin' },
-          { id: 4, name: 'mentor' },
-          { id: 5, name: 'student' },
-        ]);
+        // Fetch roles
+        const rolesRes = await fetch('/api/roles');
+        if (rolesRes.ok) {
+          const rolesData = await rolesRes.json();
+          setRoles(rolesData);
+        }
 
-        setDepartments([
-          { id: 'dept1', name: 'Computer Science' },
-          { id: 'dept2', name: 'Electronics' },
-          { id: 'dept3', name: 'Mechanical' },
-        ]);
+        // Fetch departments
+        const deptsRes = await fetch('/api/departments');
+        if (deptsRes.ok) {
+          const deptsData = await deptsRes.json();
+          // The departments API returns detailed objects, we just need id and name
+          setDepartments(deptsData.map((d: any) => ({
+            id: d.id,
+            name: d.name
+          })));
+        }
       } catch (err) {
         console.error('Error fetching data:', err);
         setError('Failed to load user data');
@@ -138,7 +141,7 @@ export default function EditUserForm() {
       }
 
       alert('User updated successfully!');
-      router.push('/dashboard/users');
+      router.push('/users');
     } catch (err) {
       console.error('Error updating user:', err);
       setError(err instanceof Error ? err.message : 'Failed to update user');
@@ -274,7 +277,7 @@ export default function EditUserForm() {
             >
               {submitting ? 'Updating...' : 'Update User'}
             </button>
-            <Link href="/dashboard/users">
+            <Link href="/users">
               <button type="button" className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">
                 Cancel
               </button>

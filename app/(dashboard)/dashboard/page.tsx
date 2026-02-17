@@ -1,36 +1,61 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 
 export const metadata: Metadata = {
-  title: "Dashboard - SMMS",
+  title: "Dashboard Overview - SMMS",
 };
 
 export default function DashboardPage() {
   return (
     <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      <h1 className="text-3xl font-bold text-gray-900 mb-6">Dashboard Overview</h1>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="font-semibold text-gray-900 mb-2">Admin Dashboard</h3>
-          <a href="/dashboard/admin" className="text-indigo-600 hover:underline text-sm mt-2 inline-block">
-            View →
-          </a>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Students</p>
+              <p className="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div className="text-3xl">👨‍🎓</div>
+          </div>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="font-semibold text-gray-900 mb-2">Mentor Dashboard</h3>
-          <a href="/dashboard/mentor" className="text-indigo-600 hover:underline text-sm mt-2 inline-block">
-            View →
-          </a>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Mentors</p>
+              <p className="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div className="text-3xl">👨‍🏫</div>
+          </div>
         </div>
         
         <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="font-semibold text-gray-900 mb-2">Student Dashboard</h3>
-          <a href="/dashboard/student" className="text-indigo-600 hover:underline text-sm mt-2 inline-block">
-            View →
-          </a>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Sessions</p>
+              <p className="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div className="text-3xl">📅</div>
+          </div>
         </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Active Alerts</p>
+              <p className="text-2xl font-bold text-gray-900">-</p>
+            </div>
+            <div className="text-3xl">⚠️</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Welcome to SMMS</h2>
+        <p className="text-gray-600">
+          Student Mentoring Management System - Use the navigation menu to access different sections.
+        </p>
       </div>
     </div>
   );

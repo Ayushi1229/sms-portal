@@ -9,7 +9,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = verifyToken(request);
+    const token = await verifyToken(request);
     if (!token) {
       return apiError('Unauthorized', 401);
     }
@@ -107,7 +107,5 @@ export async function GET(request: NextRequest) {
   } catch (error: any) {
     console.error('Dashboard error:', error);
     return apiError('Failed to fetch dashboard data', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }

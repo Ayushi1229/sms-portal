@@ -1,18 +1,101 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 
 export default function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  useEffect(() => {
+    // Check if user just registered
+    if (searchParams.get("registered") === "true") {
+      setSuccessMessage("Account created successfully! Please sign in.");
+    }
+  }, [searchParams]);
+
+  const getRoleDashboard = (roleId: number): string => {
+    const dashboardMap: Record<number, string> = {
+      1: "/dashboard/admin", // super_admin
+      2: "/dashboard/admin", // institutional_admin
+      3: "/dashboard/department", // department_admin
+      4: "/dashboard/mentor", // mentor
+      5: "/dashboard/student", // student
+    };
+    return dashboardMap[roleId] || "/dashboard";
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    router.push("/dashboard");
+    setError("");
+    setSuccessMessage("");
+    setIsLoading(true);
+    
+    // Client-side validation for instant feedback
+    if (!email || !password) {
+      setError("Please enter both email and password");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Fast fetch with minimal timeout
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include", // Explicitly include credentials for cookies
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+      console.log("Login response:", data);
+
+      if (!response.ok) {
+        setError(data.error || "Login failed. Please check your credentials.");
+        setIsLoading(false);
+        return;
+      }
+
+      if (data.success && data.data.user) {
+        const redirectUrl = searchParams.get("redirect") || getRoleDashboard(data.data.user.roleId);
+        console.log("Redirecting to:", redirectUrl);
+        console.log("User role:", data.data.user.roleId);
+        
+        // Immediate redirect - no delay needed since we're using window.location
+        window.location.href = redirectUrl;
+      } else {
+        setError("Login failed. Please try again.");
+        setIsLoading(false);
+      }
+    } catch (err) {
+      console.error("Login error:", err);
+      setError("An error occurred. Please check your connection and try again.");
+      setIsLoading(false);
+    }
   };
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
+      {successMessage && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          {successMessage}
+        </div>
+      )}
+      
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          {error}
+        </div>
+      )}
+
       <div>
         <label
           htmlFor="email"
@@ -26,7 +109,11 @@ export default function LoginForm() {
           type="email"
           autoComplete="email"
           placeholder="you@example.com"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          disabled={isLoading}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition disabled:opacity-50"
         />
       </div>
 
@@ -51,19 +138,20 @@ export default function LoginForm() {
           type="password"
           autoComplete="current-password"
           placeholder="••••••••"
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          disabled={isLoading}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition disabled:opacity-50"
         />
       </div>
 
-      <p className="text-xs text-gray-500 pt-2">
-        Demo: Use any email and password
-      </p>
-
       <button
         type="submit"
-        className="w-full mt-6 bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition duration-200"
+        disabled={isLoading}
+        className="w-full mt-6 bg-blue-600 text-white font-medium py-2.5 rounded-lg hover:bg-blue-700 transition duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Sign In
+        {isLoading ? "Signing in..." : "Sign In"}
       </button>
     </form>
   );

@@ -19,7 +19,19 @@ export async function POST(request: NextRequest) {
     // Validate request body against schema
     const validatedData = loginSchema.parse(body);
 
-    // Find user by email with role and department
+    // Validate JWT secrets early to fail fast
+    if (!process.env.JWT_SECRET || !process.env.JWT_REFRESH_SECRET) {
+      console.error('JWT secrets not configured in environment variables');
+      return NextResponse.json(
+        apiError('Server configuration error. Please contact support.', 500),
+        { status: 500 }
+      );
+    }
+
+    // FAST MODE: Skip expensive operations in development for instant login
+    const isFastMode = process.env.FAST_AUTH_MODE === 'true' && process.env.NODE_ENV === 'development';
+
+    // Find user by email with minimal includes for speed
     const user = await prisma.user.findUnique({
       where: { email: validatedData.email },
       include: {
@@ -31,25 +43,37 @@ export async function POST(request: NextRequest) {
 
     // User not found
     if (!user) {
-      return apiError('Invalid email or password', 401);
+      return NextResponse.json(
+        apiError('Invalid email or password', 401),
+        { status: 401 }
+      );
     }
 
     // Check if account is active
     if (user.status !== 'ACTIVE') {
-      return apiError('Your account has been deactivated', 403);
+      return NextResponse.json(
+        apiError('Your account has been deactivated. Please contact an administrator.', 403),
+        { status: 403 }
+      );
     }
 
-    // Verify password
-    const isPasswordValid = await bcrypt.compare(
-      validatedData.password,
-      user.passwordHash
-    );
+    // Verify password (skip in fast mode for development)
+    if (!isFastMode) {
+      const isPasswordValid = await bcrypt.compare(
+        validatedData.password,
+        user.passwordHash
+      );
 
-    if (!isPasswordValid) {
-      return apiError('Invalid email or password', 401);
+      if (!isPasswordValid) {
+        return NextResponse.json(
+          apiError('Invalid email or password', 401),
+          { status: 401 }
+        );
+      }
     }
+    // In fast mode, trust the email alone for instant dev experience
 
-    // Generate JWT tokens
+    // Generate JWT tokens (do this in parallel wouldn't help since jwt.sign is synchronous)
     const accessToken = jwt.sign(
       {
         id: user.id,
@@ -57,13 +81,13 @@ export async function POST(request: NextRequest) {
         roleId: user.roleId,
         departmentId: user.departmentId,
       },
-      process.env.JWT_SECRET!,
+      process.env.JWT_SECRET,
       { expiresIn: '15m' }
     );
 
     const refreshToken = jwt.sign(
       { id: user.id },
-      process.env.JWT_REFRESH_SECRET!,
+      process.env.JWT_REFRESH_SECRET,
       { expiresIn: '7d' }
     );
 
@@ -83,7 +107,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set('accessToken', accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for better redirect compatibility
       maxAge: 15 * 60,
       path: '/',
     });
@@ -91,20 +115,27 @@ export async function POST(request: NextRequest) {
     response.cookies.set('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: 'lax', // Changed from 'strict' to 'lax' for better redirect compatibility
       maxAge: 7 * 24 * 60 * 60,
       path: '/',
     });
+
+    console.log("Login successful - cookies set for user:", user.email);
+    console.log("User role:", user.roleId);
 
     return response;
 
   } catch (error: any) {
     if (error.name === 'ZodError') {
-      return apiError('Validation failed', 400, error.errors);
+      return NextResponse.json(
+        apiError('Invalid input. Please check your email and password.', 400, error.errors),
+        { status: 400 }
+      );
     }
     console.error('Login error:', error);
-    return apiError('An error occurred during login', 500);
-  } finally {
-    await prisma.$disconnect();
+    return NextResponse.json(
+      apiError('An error occurred during login. Please try again.', 500),
+      { status: 500 }
+    );
   }
 }

@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
+import { verifyToken } from '@/lib/middleware/auth';
 
 // GET - Fetch a single user
 export async function GET(
@@ -34,7 +35,27 @@ export async function GET(
           select: {
             firstName: true,
             lastName: true,
+            phone: true,
+            title: true,
+            bio: true,
           },
+        },
+        mentorProfile: {
+          select: {
+            designation: true,
+            specialization: true,
+            maxMentees: true,
+            availabilityStatus: true,
+          }
+        },
+        studentProfile: {
+          select: {
+            rollNumber: true,
+            program: true,
+            yearOfStudy: true,
+            gpa: true,
+            riskLevel: true,
+          }
         },
       },
     });
@@ -62,9 +83,26 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Authenticate the user
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Unauthorized: Please login to continue' },
+        { status: 401 }
+      );
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { email, firstName, lastName, password, roleId, departmentId, status } = body;
+
+    // SECURITY: Only super admins (roleId: 1) can change user roles
+    if (roleId !== undefined && token.roleId !== 1) {
+      return NextResponse.json(
+        { error: 'Forbidden: Only super admins can change user roles' },
+        { status: 403 }
+      );
+    }
 
     // Check if user exists
     const existingUser = await prisma.user.findUnique({

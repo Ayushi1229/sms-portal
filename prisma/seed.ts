@@ -78,8 +78,8 @@ async function main() {
   // ============================================================================
   console.log('👥 Seeding users...');
   
-  // Hash passwords
-  const defaultPassword = await bcrypt.hash('Password@123', 10);
+  // Hash passwords (using 4 rounds for instant login performance)
+  const defaultPassword = await bcrypt.hash('Password@123', 4);
 
   // Super Admin
   const superAdmin = await prisma.user.upsert({

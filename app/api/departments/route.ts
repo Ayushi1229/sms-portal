@@ -1,135 +1,95 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { apiResponse, apiError, apiErrorResponse } from '@/lib/api/response';
-import { handleApiError } from '@/lib/api/error';
+import { NextRequest, NextResponse } from 'next/server';
 
-/**
- * GET /api/departments
- * Get all departments with pagination and search
- */
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const search = searchParams.get('search') || '';
-    const institutionId = searchParams.get('institutionId');
-
-    const skip = (page - 1) * limit;
-
-    // Build where clause
-    const where: any = {};
-
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { code: { contains: search } },
-      ];
-    }
-
-    if (institutionId) {
-      where.institutionId = institutionId;
-    }
-
-    // Get departments with pagination
-    const [departments, total] = await Promise.all([
-      prisma.department.findMany({
-        where,
-        skip,
-        take: limit,
-        include: {
-          institution: true,
-          users: {
-            select: {
-              id: true,
-              email: true,
-              profile: true,
-            },
-          },
+    const departments = await prisma.department.findMany({
+      include: {
+        _count: {
+          select: {
+            users: true, // This will include all users (admins, mentors, students)
+            mentorAssignments: true,
+          }
         },
-        orderBy: { createdAt: 'desc' },
-      }),
-      prisma.department.count({ where }),
-    ]);
+        users: {
+          select: {
+            role: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        name: 'asc',
+      },
+    });
 
-    return NextResponse.json(
-      apiResponse({
-        departments,
-        pagination: {
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit),
-        },
-      }),
-      { status: 200 }
-    );
+    // Format the data to match the component's expectations
+    const formattedDepartments = departments.map(dept => {
+      const mentors = dept.users.filter(u => u.role.name === 'mentor').length;
+      const students = dept.users.filter(u => u.role.name === 'student').length;
+      
+      return {
+        id: dept.id,
+        code: dept.code,
+        name: dept.name,
+        mentors: mentors,
+        students: students,
+        status: 'Active', // Status is not explicitly in the schema, defaulting to Active
+      };
+    });
+
+    return NextResponse.json(formattedDepartments);
   } catch (error) {
-    return handleApiError(error);
+    console.error('Error fetching departments:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch departments' },
+      { status: 500 }
+    );
   }
 }
 
-/**
- * POST /api/departments
- * Create a new department
- */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { institutionId, name, code } = body;
+    const { name, code, institutionId } = body;
 
-    // Validate required fields
-    if (!institutionId || !name || !code) {
+    if (!name || !code) {
       return NextResponse.json(
-        apiError('Missing required fields', 400),
+        { error: 'Missing required fields: name, code' },
         { status: 400 }
       );
     }
 
-    // Check if institution exists
-    const institution = await prisma.institution.findUnique({
-      where: { id: institutionId },
-    });
-
-    if (!institution) {
-      return NextResponse.json(
-        apiError('Institution not found', 404),
-        { status: 404 }
-      );
+    // Get an institution ID if not provided
+    let finalInstitutionId = institutionId;
+    if (!finalInstitutionId) {
+      const institution = await prisma.institution.findFirst();
+      if (!institution) {
+        return NextResponse.json(
+          { error: 'No institution found. Please create an institution first.' },
+          { status: 400 }
+        );
+      }
+      finalInstitutionId = institution.id;
     }
 
-    // Check if department with same code exists in this institution
-    const existingDept = await prisma.department.findFirst({
-      where: {
-        institutionId,
-        code,
-      },
-    });
-
-    if (existingDept) {
-      return NextResponse.json(
-        apiError('Department with this code already exists', 409),
-        { status: 409 }
-      );
-    }
-
-    // Create department
     const department = await prisma.department.create({
       data: {
-        institutionId,
         name,
         code,
-      },
-      include: {
-        institution: true,
+        institutionId: finalInstitutionId,
       },
     });
 
-    return NextResponse.json(
-      apiResponse(department, 'Department created successfully'),
-      { status: 201 }
-    );
+    return NextResponse.json(department, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('Error creating department:', error);
+    return NextResponse.json(
+      { error: 'Failed to create department' },
+      { status: 500 }
+    );
   }
 }

@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, firstName, lastName, password, roleId, departmentId } = body;
+    const { email, firstName, lastName, password, roleId, departmentId, status } = body;
 
     // Validate required fields
     if (!email || !firstName || !lastName || !password || !roleId) {
@@ -76,6 +76,15 @@ export async function POST(request: NextRequest) {
     // Get the institution ID (use first institution if available)
     const institution = await prisma.institution.findFirst();
 
+    // Get the role to check if it's a mentor or student
+    const role = await prisma.role.findUnique({
+      where: { id: typeof roleId === 'string' ? parseInt(roleId) : roleId },
+    });
+
+    if (!role) {
+      return NextResponse.json({ error: 'Role not found' }, { status: 404 });
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -84,16 +93,33 @@ export async function POST(request: NextRequest) {
       data: {
         email,
         passwordHash,
-        roleId: typeof roleId === 'string' ? parseInt(roleId) : roleId,
+        roleId: role.id,
         departmentId: departmentId || null,
         institutionId: institution?.id || null,
-        status: 'INVITED',
+        status: status || 'ACTIVE',
         profile: {
           create: {
             firstName,
             lastName,
           },
         },
+        // Automatically create Mentor or Student profiles if applicable
+        ...(role.name === 'mentor' && {
+          mentorProfile: {
+            create: {
+              specialization: 'General',
+              availabilityStatus: 'AVAILABLE',
+            }
+          }
+        }),
+        ...(role.name === 'student' && {
+          studentProfile: {
+            create: {
+              rollNumber: `TEMP-${Date.now()}`, // Generate a temporary roll number
+              riskLevel: 'LOW',
+            }
+          }
+        }),
       },
       select: {
         id: true,

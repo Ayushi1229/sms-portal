@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
-    const token = verifyToken(request);
+    const token = await verifyToken(request);
 
     if (!token) {
       return apiError('Unauthorized', 401);
@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
       include: {
         role: true,
         department: true,
+        profile: true,
       },
     });
 
@@ -28,7 +29,7 @@ export async function GET(request: NextRequest) {
       return apiError('User not found', 404);
     }
 
-    const { password, ...userWithoutPassword } = user;
+    const { passwordHash, ...userWithoutPassword } = user;
 
     return NextResponse.json(
       apiResponse(userWithoutPassword),
@@ -37,7 +38,5 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     return apiError('An error occurred', 500);
-  } finally {
-    await prisma.$disconnect();
   }
 }

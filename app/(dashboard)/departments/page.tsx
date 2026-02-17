@@ -1,37 +1,57 @@
-﻿import type { Metadata } from "next";
+﻿'use client';
+
+import { useEffect, useState } from "react";
 import { SearchIcon, FilterIcon, PlusIcon, Users } from "lucide-react";
 
-export const metadata: Metadata = {
-  title: "Departments - SMMS",
-};
+interface Department {
+  id: string | number;
+  code: string;
+  name: string;
+  mentors: number;
+  students: number;
+  status: string;
+}
 
 export default function DepartmentsPage() {
-  const departments = [
-    {
-      id: 1,
-      code: "CSE",
-      name: "Computer Science & Engineering",
-      mentors: 8,
-      students: 45,
-      status: "Active",
-    },
-    {
-      id: 2,
-      code: "ECE",
-      name: "Electronics & Communication",
-      mentors: 6,
-      students: 38,
-      status: "Active",
-    },
-    {
-      id: 3,
-      code: "ME",
-      name: "Mechanical Engineering",
-      mentors: 5,
-      students: 32,
-      status: "Active",
-    },
-  ];
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    fetchDepartments();
+  }, []);
+
+  const fetchDepartments = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/departments');
+      if (!response.ok) {
+        throw new Error('Failed to fetch departments');
+      }
+      const data = await response.json();
+      setDepartments(data);
+    } catch (err) {
+      console.error('Error fetching departments:', err);
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredDepartments = departments.filter(dept => 
+    dept.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    dept.code.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="ml-2 text-gray-600">Loading departments...</span>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -50,6 +70,8 @@ export default function DepartmentsPage() {
           <input
             type="text"
             placeholder="Search departments..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -64,34 +86,46 @@ export default function DepartmentsPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800">{error}</p>
+        </div>
+      )}
+
       {/* Departments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {departments.map((dept) => (
-          <div key={dept.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">{dept.name}</h3>
-                <p className="text-sm text-gray-600 font-mono">{dept.code}</p>
-              </div>
-              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                {dept.status}
-              </span>
-            </div>
-
-            <div className="space-y-3 mb-4">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Users size={18} className="text-blue-600" />
-                <span className="text-sm"><span className="font-semibold">{dept.mentors}</span> Mentors</span>
-              </div>
-              <div className="flex items-center gap-2 text-gray-600">
-                <Users size={18} className="text-green-600" />
-                <span className="text-sm"><span className="font-semibold">{dept.students}</span> Students</span>
-              </div>
-            </div>
-
-            <button className="w-full text-blue-600 hover:underline text-sm font-semibold">View Details →</button>
+        {filteredDepartments.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-gray-500">
+            No departments found.
           </div>
-        ))}
+        ) : (
+          filteredDepartments.map((dept) => (
+            <div key={dept.id} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{dept.name}</h3>
+                  <p className="text-sm text-gray-600 font-mono">{dept.code}</p>
+                </div>
+                <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
+                  {dept.status}
+                </span>
+              </div>
+
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Users size={18} className="text-blue-600" />
+                  <span className="text-sm"><span className="font-semibold">{dept.mentors}</span> Mentors</span>
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <Users size={18} className="text-green-600" />
+                  <span className="text-sm"><span className="font-semibold">{dept.students}</span> Students</span>
+                </div>
+              </div>
+
+              <button className="w-full text-blue-600 hover:underline text-sm font-semibold">View Details →</button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
