@@ -10,7 +10,7 @@ export enum Role {
   STUDENT = 5,
 }
 
-export const RoleNames: Record<number, string> = {
+export const RoleNames: Record<number, string > = {
   [Role.SUPER_ADMIN]: 'Super Admin',
   [Role.INSTITUTIONAL_ADMIN]: 'Institutional Admin',
   [Role.DEPARTMENT_ADMIN]: 'Department Admin',
