@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { verifyToken } from '@/lib/middleware/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
+import {
+  CoreApiError,
+  getGoalAccessWhere,
+  normalizeDateInput,
+  parseGoalCategory,
+  parseGoalStatus,
+  requirePermission,
+} from '@/lib/services/week8-core';
 /**
  * GET /api/goals/[id]
  * Get single goal by ID
@@ -14,12 +20,15 @@ export async function GET(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
-    const goal = await prisma.goal.findUnique({
-      where: { id },
+    const goal = await prisma.goal.findFirst({
+      where: {
+        id,
+        ...getGoalAccessWhere(token),
+      },
       include: {
         student: {
           include: {
@@ -45,17 +54,18 @@ export async function GET(
     });
 
     if (!goal) {
-      return apiError('Goal not found', 404);
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
     }
 
-    return NextResponse.json(
-      apiResponse(goal),
-      { status: 200 }
-    );
+    return NextResponse.json(goal, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Get goal error:', error);
-    return apiError('Failed to fetch goal', 500);
+    return NextResponse.json({ error: 'Failed to fetch goal' }, { status: 500 });
   }
 }
 
@@ -70,8 +80,10 @@ export async function PUT(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    requirePermission(token, 'EDIT_GOAL');
 
     const { id } = await params;
     const body = await request.json();
@@ -84,15 +96,47 @@ export async function PUT(
       progressPct,
     } = body;
 
+    const existingGoal = await prisma.goal.findFirst({
+      where: {
+        id,
+        ...getGoalAccessWhere(token),
+      },
+      select: { id: true },
+    });
+
+    if (!existingGoal) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
+    }
+
+    if (title !== undefined && typeof title === 'string' && title.trim().length < 3) {
+      return NextResponse.json({ error: 'Title must be at least 3 characters long' }, { status: 400 });
+    }
+
+    if (progressPct !== undefined && (typeof progressPct !== 'number' || progressPct < 0 || progressPct > 100)) {
+      return NextResponse.json({ error: 'Progress must be between 0 and 100' }, { status: 400 });
+    }
+
+    const normalizedCategory = category ? parseGoalCategory(category) : undefined;
+    const normalizedStatus = status ? parseGoalStatus(status) : undefined;
+
+    const resolvedStatus =
+      normalizedStatus ?? (progressPct === 100 ? 'COMPLETED' : undefined);
+    const resolvedProgress =
+      resolvedStatus === 'COMPLETED'
+        ? 100
+        : progressPct !== undefined
+          ? progressPct
+          : undefined;
+
     const updatedGoal = await prisma.goal.update({
       where: { id },
       data: {
-        title,
+        title: title !== undefined ? String(title).trim() : undefined,
         description,
-        category,
-        targetDate: targetDate ? new Date(targetDate) : undefined,
-        status,
-        progressPct: progressPct !== undefined ? progressPct : undefined,
+        category: normalizedCategory,
+        targetDate: targetDate ? normalizeDateInput(targetDate) : undefined,
+        status: resolvedStatus,
+        progressPct: resolvedProgress,
       },
       include: {
         student: {
@@ -109,17 +153,18 @@ export async function PUT(
     })
     ;
 
-    return NextResponse.json(
-      apiResponse({
-        goal: updatedGoal,
-        message: 'Goal updated successfully',
-      }),
-      { status: 200 }
-    );
+    return NextResponse.json({
+      goal: updatedGoal,
+      message: 'Goal updated successfully',
+    }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Update goal error:', error);
-    return apiError('Failed to update goal', 500);
+    return NextResponse.json({ error: 'Failed to update goal' }, { status: 500 });
   }
 }
 
@@ -134,21 +179,37 @@ export async function DELETE(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    requirePermission(token, 'EDIT_GOAL');
+
     const { id } = await params;
+
+    const existingGoal = await prisma.goal.findFirst({
+      where: {
+        id,
+        ...getGoalAccessWhere(token),
+      },
+      select: { id: true },
+    });
+
+    if (!existingGoal) {
+      return NextResponse.json({ error: 'Goal not found' }, { status: 404 });
+    }
+
     await prisma.goal.delete({
       where: { id },
     });
 
-    return NextResponse.json(
-      apiResponse({ message: 'Goal deleted successfully' }),
-      { status: 200 }
-    );
+    return NextResponse.json({ message: 'Goal deleted successfully' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Delete goal error:', error);
-    return apiError('Failed to delete goal', 500);
+    return NextResponse.json({ error: 'Failed to delete goal' }, { status: 500 });
   }
 }

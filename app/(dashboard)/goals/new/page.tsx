@@ -54,18 +54,10 @@ export default function NewGoalPage() {
     setError(null);
 
     try {
-      // Fetch admin user for createdById
-      const usersRes = await fetch('/api/users');
-      const users = await usersRes.json();
-      const admin = users.find((u: any) => u.role.name === 'super_admin' || u.role.name === 'admin');
-
       const response = await fetch('/api/goals', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...formData,
-          createdById: admin?.id || users[0]?.id
-        }),
+        body: JSON.stringify(formData),
       });
 
       if (!response.ok) {

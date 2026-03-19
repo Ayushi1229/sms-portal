@@ -10,13 +10,13 @@ const getMenuStructure = (roleId: number) => {
   const navigation = getAllowedNavigation(roleId);
   
   // Organize navigation items into sections based on role
-  const menuItems: Array<{ section: string; items: Array<{ href: string; label: string; icon: string }> }> = [];
+  const menuItems: Array<{ section: string; items: Array<{ href: string; label: string }> }> = [];
 
   // Dashboard section (all roles)
   menuItems.push({
     section: "Dashboard",
     items: [
-      { href: "/dashboard", label: "Overview", icon: "📊" },
+      { href: "/dashboard", label: "Overview" },
     ],
   });
 
@@ -25,12 +25,12 @@ const getMenuStructure = (roleId: number) => {
     menuItems.push({
       section: "Administration",
       items: [
-        { href: "/users", label: "Users", icon: "👥" },
+        { href: "/users", label: "Users" },
         ...(roleId === Role.SUPER_ADMIN ? [
-          { href: "/institutions", label: "Institutions", icon: "🏛️" },
-          { href: "/roles", label: "Roles", icon: "🔐" },
+          { href: "/institutions", label: "Institutions" },
+          { href: "/roles", label: "Roles" },
         ] : []),
-        { href: "/departments", label: "Departments", icon: "🏫" },
+        { href: "/departments", label: "Departments" },
       ],
     });
   }
@@ -40,24 +40,24 @@ const getMenuStructure = (roleId: number) => {
     menuItems.push({
       section: "User Management",
       items: [
-        { href: "/mentors", label: "Mentors", icon: "👨‍🏫" },
-        { href: "/students", label: "Students", icon: "👨‍🎓" },
-        { href: "/assignments", label: "Assignments", icon: "🔗" },
+        { href: "/mentors", label: "Mentors" },
+        { href: "/students", label: "Students" },
+        { href: "/assignments", label: "Assignments" },
       ],
     });
   } else if (roleId === Role.MENTOR) {
     menuItems.push({
       section: "My Mentees",
       items: [
-        { href: "/students", label: "My Students", icon: "👨‍🎓" },
-        { href: "/assignments", label: "My Assignments", icon: "🔗" },
+        { href: "/students", label: "My Students" },
+        { href: "/assignments", label: "My Assignments" },
       ],
     });
   } else if (roleId === Role.STUDENT) {
     menuItems.push({
       section: "My Mentoring",
       items: [
-        { href: "/mentors", label: "My Mentor", icon: "👨‍🏫" },
+        { href: "/mentors", label: "My Mentor" },
       ],
     });
   }
@@ -66,9 +66,9 @@ const getMenuStructure = (roleId: number) => {
   menuItems.push({
     section: "Mentoring",
     items: [
-      { href: "/sessions", label: "Sessions", icon: "📅" },
-      { href: "/goals", label: "Goals", icon: "🎯" },
-      { href: "/feedback", label: "Feedback", icon: "💬" },
+      { href: "/sessions", label: "Sessions" },
+      { href: "/goals", label: "Goals" },
+      { href: "/feedback", label: "Feedback" },
     ],
   });
 
@@ -76,8 +76,8 @@ const getMenuStructure = (roleId: number) => {
   menuItems.push({
     section: "Monitoring",
     items: [
-      { href: "/alerts", label: "Alerts", icon: "⚠️" },
-      { href: "/notifications", label: "Notifications", icon: "🔔" },
+      { href: "/alerts", label: "Alerts" },
+      { href: "/notifications", label: "Notifications" },
     ],
   });
 
@@ -86,8 +86,8 @@ const getMenuStructure = (roleId: number) => {
     menuItems.push({
       section: "Reports",
       items: [
-        { href: "/reports", label: "Reports Dashboard", icon: "📈" },
-        { href: "/audit", label: "Audit Logs", icon: "📋" },
+        { href: "/reports", label: "Reports Dashboard" },
+        { href: "/audit", label: "Audit Logs" },
       ],
     });
   }
@@ -96,7 +96,7 @@ const getMenuStructure = (roleId: number) => {
   menuItems.push({
     section: "System",
     items: [
-      { href: "/settings", label: "Settings", icon: "⚙️" },
+      { href: "/settings", label: "Settings" },
     ],
   });
 
@@ -109,7 +109,7 @@ export default function Sidebar() {
 
   if (isLoading) {
     return (
-      <aside className="w-64 bg-gray-50 border-r border-gray-200 min-h-screen">
+      <aside className="w-64 bg-gray-50 border-r border-gray-200 h-[calc(100vh-64px)] sticky top-16 overflow-y-auto">
         <div className="p-4">
           <div className="mb-6 p-3 bg-white rounded-lg shadow-sm animate-pulse">
             <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
@@ -128,7 +128,7 @@ export default function Sidebar() {
     : user?.email || "Guest";
 
   return (
-    <aside className="w-64 bg-gray-50 border-r border-gray-200 min-h-screen">
+    <aside className="w-64 bg-gray-50 border-r border-gray-200 h-[calc(100vh-64px)] sticky top-16 overflow-y-auto">
       <div className="p-4">
         <div className="mb-6 p-3 bg-white rounded-lg shadow-sm">
           <div className="text-sm font-medium text-gray-700">Logged in as</div>
@@ -152,13 +152,12 @@ export default function Sidebar() {
                     <li key={item.href}>
                       <Link
                         href={item.href}
-                        className={`flex items-center space-x-3 px-3 py-2 rounded-md text-sm transition-colors ${
+                        className={`flex items-center px-3 py-2 rounded-md text-sm transition-colors ${
                           isActive
                             ? "bg-indigo-100 text-indigo-700 font-medium"
                             : "text-gray-700 hover:bg-gray-100"
                         }`}
                       >
-                        <span>{item.icon}</span>
                         <span>{item.label}</span>
                       </Link>
                     </li>

@@ -1,7 +1,22 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from "react";
-import { SearchIcon, FilterIcon, PlusIcon, Clock, MapPin } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import {
+  Search,
+  Filter,
+  Plus,
+  Clock,
+  MapPin,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Video,
+  User,
+  ExternalLink,
+  XCircle
+} from "lucide-react";
 import Link from "next/link";
 
 interface Session {
@@ -16,25 +31,56 @@ interface Session {
   topic: string;
 }
 
+interface ApiPagination {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNext: boolean;
+  hasPrev: boolean;
+}
+
 export default function SessionsPage() {
+  const searchParams = useSearchParams();
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
+  const [status, setStatus] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<ApiPagination | null>(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchSessions();
-  }, []);
+  }, [debouncedSearch, status, dateFrom, page]);
 
   const fetchSessions = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/sessions');
+      const params = new URLSearchParams({
+        paginated: 'true',
+        page: String(page),
+        pageSize: '100',
+      });
+
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (status) params.set('status', status);
+      if (dateFrom) params.set('dateFrom', dateFrom);
+
+      const response = await fetch(`/api/sessions?${params.toString()}`);
       if (!response.ok) {
         throw new Error('Failed to fetch sessions');
       }
       const data = await response.json();
-      setSessions(data);
+      setSessions(data.items || []);
+      setPagination(data.pagination || null);
     } catch (err) {
       console.error('Error fetching sessions:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -45,134 +91,165 @@ export default function SessionsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
-      case "SCHEDULED":
-        return "bg-blue-100 text-blue-800";
-      case "COMPLETED":
-        return "bg-green-100 text-green-800";
-      case "CANCELLED":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
+      case "SCHEDULED": return "bg-blue-50 text-blue-600 border-blue-100";
+      case "COMPLETED": return "bg-emerald-50 text-emerald-600 border-emerald-100";
+      case "CANCELLED": return "bg-rose-50 text-rose-600 border-rose-100";
+      default: return "bg-gray-50 text-gray-600 border-gray-100";
     }
   };
 
-  const filteredSessions = sessions.filter(session => 
-    session.mentor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    session.student.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    session.topic.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-2 text-gray-600">Loading sessions...</span>
-      </div>
-    );
-  }
-
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Sessions</h1>
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Mentoring Sessions</h1>
+          <p className="text-gray-500 mt-1">Manage and track all scheduled meetings</p>
+        </div>
         <Link href="/sessions/schedule">
-          <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-            <PlusIcon size={20} />
+          <button className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition shadow-sm hover:shadow-md font-bold">
+            <Plus size={20} />
             Schedule Session
           </button>
         </Link>
       </div>
 
-      {/* Filters */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-        <div className="relative col-span-2">
-          <SearchIcon className="absolute left-3 top-3 text-gray-400" size={20} />
+      {/* Modern Filter Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
+        <div className="lg:col-span-5 relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Search sessions..."
+            placeholder="Search by topic, student or mentor..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
           />
         </div>
-        <select className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-          <option>All Statuses</option>
-          <option>Scheduled</option>
-          <option>Completed</option>
-          <option>Cancelled</option>
-        </select>
-        <input
-          type="date"
-          className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <button className="flex items-center justify-center gap-2 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300">
-          <FilterIcon size={20} />
-          Filter
+        <div className="lg:col-span-3">
+          <select
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value);
+              setPage(1);
+            }}
+            className="w-full px-4 py-2.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="SCHEDULED">Scheduled</option>
+            <option value="COMPLETED">Completed</option>
+            <option value="CANCELLED">Cancelled</option>
+          </select>
+        </div>
+        <div className="lg:col-span-3">
+          <div className="relative">
+            <CalendarIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
+              className="w-full pl-11 pr-4 py-2.5 bg-gray-50 border-none rounded-xl focus:ring-2 focus:ring-indigo-500 transition-all text-sm"
+            />
+          </div>
+        </div>
+        <button className="lg:col-span-1 flex items-center justify-center p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors">
+          <Filter size={18} />
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-rose-50 border border-rose-100 text-rose-700 rounded-xl p-4 flex items-center gap-3">
+          <XCircle size={20} />
+          <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
-      {/* Sessions List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Mentor - Student</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Topic</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Date & Time</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Mode & Location</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Status</th>
-              <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSessions.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
-                  No sessions found.
-                </td>
+      {/* Advanced Sessions Table */}
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Topic & Participants</th>
+                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Timing</th>
+                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest">Mode</th>
+                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+                <th className="px-8 py-5 text-xs font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
               </tr>
-            ) : (
-              filteredSessions.map((session) => (
-                <tr key={session.id} className="border-b hover:bg-gray-50 transition">
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="font-medium">{session.mentor}</div>
-                    <div className="text-gray-600 text-xs">{session.student}</div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{session.topic}</td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <div>{session.date}</div>
-                    <div className="flex items-center gap-1 text-gray-500 text-xs">
-                      <Clock size={14} />
-                      {session.time}
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {loading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td colSpan={5} className="px-8 py-4"><div className="h-12 bg-gray-50 rounded-xl"></div></td>
+                  </tr>
+                ))
+              ) : sessions.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-8 py-20 text-center">
+                    <div className="flex flex-col items-center gap-3 opacity-30">
+                      <CalendarIcon size={48} />
+                      <p className="font-bold">No sessions found.</p>
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    <div>{session.mode}</div>
-                    <div className="flex items-center gap-1 text-gray-500 text-xs">
-                      <MapPin size={14} />
-                      {session.location}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(session.status)}`}>
-                      {session.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    <button className="text-blue-600 hover:underline">View Details</button>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                sessions.map((session) => (
+                  <tr key={session.id} className="group hover:bg-indigo-50/30 transition-colors">
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{session.topic}</span>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-gray-400 font-medium">
+                          <User size={12} />
+                          <span>{session.mentor} • {session.student}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-700">{session.date}</span>
+                        <div className="flex items-center gap-1.5 mt-1 text-xs text-indigo-400 font-bold uppercase tracking-wider">
+                          <Clock size={12} />
+                          {session.time}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-2">
+                        <div className={`p-1.5 rounded-lg ${session.mode === 'ONLINE' ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-600'}`}>
+                          {session.mode === 'ONLINE' ? <Video size={14} /> : <MapPin size={14} />}
+                        </div>
+                        <span className="text-xs font-bold text-gray-600">{session.location || session.mode}</span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5">
+                      <div className="flex justify-center">
+                        <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border ${getStatusColor(session.status)}`}>
+                          {session.status}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <Link href={`/sessions/${session.id}`}>
+                        <button className="inline-flex items-center gap-2 text-indigo-600 bg-indigo-50 px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 hover:text-white transition-all">
+                          Details
+                          <ExternalLink size={14} />
+                        </button>
+                      </Link>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
     </div>
   );
 }

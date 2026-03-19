@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { verifyToken } from '@/lib/middleware/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
+import { apiResponse, apiErrorResponse } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
 /**
  * GET /api/dashboard
@@ -11,7 +10,7 @@ export async function GET(request: NextRequest) {
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return apiErrorResponse('Unauthorized', 401);
     }
 
     // Get overall statistics
@@ -36,20 +35,16 @@ export async function GET(request: NextRequest) {
     // Get recent sessions
     const recentSessions = await prisma.sessionRecord.findMany({
       take: 5,
-      orderBy: { scheduledAt: 'desc' },
+      orderBy: { sessionDate: 'desc' },
       include: {
-        mentor: {
+        assignment: {
           include: {
-            user: {
+            mentor: {
               include: {
                 profile: true,
               },
             },
-          },
-        },
-        student: {
-          include: {
-            user: {
+            student: {
               include: {
                 profile: true,
               },
@@ -106,6 +101,6 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('Dashboard error:', error);
-    return apiError('Failed to fetch dashboard data', 500);
+    return apiErrorResponse('Failed to fetch dashboard data', 500);
   }
 }

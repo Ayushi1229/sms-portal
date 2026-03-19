@@ -60,12 +60,6 @@ export default function ScheduleSessionPage() {
       // Create a combined ISO string for sessionDate
       const sessionDate = new Date(`${formData.date}T${formData.time}`).toISOString();
       
-      // In a real app we'd get this from the session
-      // For now, let's fetch any admin user to act as creator
-      const usersRes = await fetch('/api/users');
-      const users = await usersRes.json();
-      const admin = users.find((u: any) => u.role.name === 'super_admin' || u.role.name === 'admin');
-      
       const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -75,7 +69,6 @@ export default function ScheduleSessionPage() {
           mode: formData.mode,
           location: formData.location,
           topic: formData.topic,
-          createdById: admin?.id || users[0]?.id
         }),
       });
 

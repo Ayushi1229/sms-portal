@@ -50,15 +50,9 @@ export default function NewFeedbackPage() {
     setError(null);
 
     try {
-      // Find the session to get user IDs
-      const sessionRes = await fetch(`/api/sessions`); // Usually we'd get full details
-      // For simplicity in this demo, we'll fetch all session details from the session itself
-      // In a real app, we'd probably have deeper API endpoints
-      
       const currentSession = sessions.find(s => s.id === formData.sessionId);
       if (!currentSession) throw new Error("Session not found");
 
-      // We need user IDs. Let's fetch the detailed session from API
       const detailRes = await fetch(`/api/feedback/session-users?sessionId=${formData.sessionId}`);
       const ids = await detailRes.json();
 

@@ -6,13 +6,6 @@
     --foreground: #171717;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: #0a0a0a;
-      --foreground: #ededed;
-    }
-  }
-
   body {
     background: var(--background);
     color: var(--foreground);
@@ -45,4 +38,24 @@ textarea:disabled,
 select:disabled {
   background-color: #f9fafb !important;
   color: #6b7280 !important;
+}
+
+@keyframes blob {
+  0% { transform: translate(0px, 0px) scale(1); }
+  33% { transform: translate(30px, -50px) scale(1.1); }
+  66% { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0px, 0px) scale(1); }
+}
+
+@theme inline {
+  --animate-blob: blob 7s infinite;
+  --animate-spin-slow: spin 8s linear infinite;
+}
+
+.animation-delay-2000 {
+  animation-delay: 2s;
+}
+
+.animation-delay-4000 {
+  animation-delay: 4s;
 }

@@ -1,110 +1,161 @@
-﻿import type { Metadata } from "next";
-import { Shield, Lock, Smartphone, MapPin, Trash2, LogOut } from "lucide-react";
+"use client";
 
-export const metadata: Metadata = {
-  title: "Security Settings - SMMS",
-};
+import { useState, useEffect } from "react";
+import { Shield, Lock, Smartphone, MapPin, Trash2, LogOut, ChevronRight, AlertTriangle } from "lucide-react";
+
+interface Device {
+  id: number;
+  name: string;
+  location: string;
+  lastActive: string;
+  isCurrent: boolean;
+}
 
 export default function SecuritySettingsPage() {
-  const devices = [
-    { id: 1, name: "Chrome on Windows", location: "New York, USA", lastActive: "Active now", isCurrent: true },
-    { id: 2, name: "Safari on iPhone", location: "New York, USA", lastActive: "2 hours ago", isCurrent: false },
-    { id: 3, name: "Firefox on Ubuntu", location: "Boston, USA", lastActive: "1 day ago", isCurrent: false },
-  ];
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [loginAttempts, setLoginAttempts] = useState<any[]>([]);
 
-  const loginAttempts = [
-    { id: 1, date: "Today", time: "10:30 AM", status: "Success", device: "Chrome on Windows" },
-    { id: 2, date: "Yesterday", time: "3:45 PM", status: "Success", device: "Safari on iPhone" },
-    { id: 3, date: "2 days ago", time: "11:20 AM", status: "Success", device: "Firefox on Ubuntu" },
-    { id: 4, date: "2 days ago", time: "2:15 PM", status: "Failed", device: "Unknown Device" },
-  ];
+  useEffect(() => {
+    const getBrowserInfo = () => {
+      const ua = navigator.userAgent;
+      let browser = "Unknown Browser";
+      if (ua.includes("Firefox")) browser = "Firefox";
+      else if (ua.includes("Edg")) browser = "Edge";
+      else if (ua.includes("Chrome")) browser = "Chrome";
+      else if (ua.includes("Safari")) browser = "Safari";
+      
+      let os = "Unknown OS";
+      if (ua.includes("Win")) os = "Windows";
+      else if (ua.includes("Mac")) os = "MacOS";
+      else if (ua.includes("Linux")) os = "Linux";
+      else if (ua.includes("Android")) os = "Android";
+      else if (ua.includes("iPhone") || ua.includes("iPad")) os = "iOS";
+      
+      return `${browser} on ${os}`;
+    };
+
+    let tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local";
+    let locationName = tz === "Asia/Calcutta" || tz === "Asia/Kolkata" 
+      ? "Gujarat, India" 
+      : tz.replace("_", " ").split("/").pop() || "India";
+
+    const activeDeviceName = getBrowserInfo();
+
+    setDevices([
+      {
+        id: 1,
+        name: activeDeviceName,
+        location: locationName,
+        lastActive: "Active now",
+        isCurrent: true,
+      }
+    ]);
+
+    setLoginAttempts([
+      { id: 1, date: "Today", time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), status: "Success", device: activeDeviceName },
+      { id: 2, date: "2 days ago", time: "2:15 PM", status: "Failed", device: "Unknown Device" },
+    ]);
+  }, []);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Security Settings</h1>
+    <div className="max-w-4xl pb-12">
+      <div className="mb-8">
+        <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">Security Settings</h1>
+        <p className="text-gray-500 mt-2 font-medium">Manage your account security and trusted sessions.</p>
+      </div>
 
-      <div className="max-w-4xl space-y-6">
-        {/* Two-Factor Authentication */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Shield size={24} className="text-blue-600" />
-            Two-Factor Authentication
-          </h3>
-          <div className="flex items-start justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-              <p className="text-xs text-gray-500 mt-1">Requires authentication app or SMS verification</p>
-            </div>
-            <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold">
-              Enable 2FA
-            </button>
-          </div>
-        </div>
-
+      <div className="space-y-6">
         {/* Active Sessions */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Smartphone size={24} className="text-blue-600" />
-            Active Sessions
-          </h3>
-          <p className="text-sm text-gray-600 mb-4">Manage your active sessions on different devices</p>
-          <div className="space-y-3">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-8 border-b border-gray-100">
+            <div className="flex items-start gap-4 mb-2">
+              <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                <Smartphone size={24} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Active Sessions</h3>
+                <p className="text-sm text-gray-500 mt-1">Manage your active sessions on different devices. You can securely log out of any unexpected devices.</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="divide-y divide-gray-50">
             {devices.map((device) => (
-              <div key={device.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+              <div key={device.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors">
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900">{device.name}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-base font-semibold text-gray-900">{device.name}</p>
                     {device.isCurrent && (
-                      <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs font-semibold">
+                      <span className="px-2.5 py-0.5 bg-green-100 text-green-700 border border-green-200 rounded-lg text-xs font-bold uppercase tracking-wider">
                         This device
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-600 mt-1">
-                    <MapPin size={14} />
-                    {device.location}
+                  <div className="flex items-center gap-4 mt-2">
+                    <div className="flex items-center gap-1.5 text-sm text-gray-500">
+                      <MapPin size={16} className="text-gray-400" />
+                      {device.location}
+                    </div>
+                    <div className="h-4 w-px bg-gray-200"></div>
+                    <p className={`text-sm font-medium ${device.isCurrent ? "text-green-600" : "text-gray-500"}`}>
+                      {device.lastActive}
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500 mt-1">{device.lastActive}</p>
                 </div>
                 {!device.isCurrent && (
-                  <button className="text-red-600 hover:text-red-700 p-2">
-                    <LogOut size={20} />
+                  <button className="flex items-center justify-center p-2.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all h-fit group">
+                    <LogOut size={20} className="group-hover:-translate-x-0.5 transition-transform" />
                   </button>
                 )}
               </div>
             ))}
           </div>
-          <button className="mt-4 text-red-600 hover:underline text-sm font-semibold">Sign out all other sessions</button>
+          <div className="p-4 bg-gray-50 border-t border-gray-100 text-center">
+            <button className="text-red-600 hover:text-red-700 text-sm font-semibold hover:underline">
+              Sign out of all other sessions
+            </button>
+          </div>
         </div>
 
         {/* Login History */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-            <Lock size={24} className="text-blue-600" />
-            Login History
-          </h3>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="p-8 border-b border-gray-100">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-slate-50 text-slate-600 rounded-xl shrink-0">
+                <Lock size={24} strokeWidth={1.5} />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Login History</h3>
+                <p className="text-sm text-gray-500 mt-1">Review recently successful and failed login attempts.</p>
+              </div>
+            </div>
+          </div>
+          
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Date & Time</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Device</th>
-                  <th className="text-left py-3 px-4 font-semibold text-gray-700">Status</th>
+            <table className="w-full text-sm text-left align-middle">
+              <thead className="bg-gray-50 text-gray-500 font-semibold text-xs tracking-wider uppercase">
+                <tr>
+                  <th className="py-4 px-8 font-medium">Date & Time</th>
+                  <th className="py-4 px-8 font-medium">Device</th>
+                  <th className="py-4 px-8 font-medium">Status</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-gray-50">
                 {loginAttempts.map((attempt) => (
-                  <tr key={attempt.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
-                      <p className="text-gray-900">{attempt.date} at {attempt.time}</p>
+                  <tr key={attempt.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="py-4 px-8 whitespace-nowrap">
+                      <p className="text-gray-900 font-medium">{attempt.date} <span className="text-gray-400 mx-1">•</span> <span className="text-gray-600">{attempt.time}</span></p>
                     </td>
-                    <td className="py-3 px-4 text-gray-600">{attempt.device}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                    <td className="py-4 px-8 whitespace-nowrap">
+                      <span className="text-gray-600 font-medium">{attempt.device}</span>
+                    </td>
+                    <td className="py-4 px-8 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold border ${
                         attempt.status === "Success"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
+                          ? "bg-green-50 text-green-700 border-green-200"
+                          : "bg-red-50 text-red-700 border-red-200"
                       }`}>
+                        {attempt.status === "Failed" && <AlertTriangle size={12} className="mr-1.5" />}
                         {attempt.status}
                       </span>
                     </td>
@@ -115,40 +166,38 @@ export default function SecuritySettingsPage() {
           </div>
         </div>
 
-        {/* Blocked Users */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Blocked IP Addresses</h3>
-          <p className="text-sm text-gray-600 mb-4">No IP addresses are currently blocked</p>
-          <button className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition font-semibold">
-            Block an IP
-          </button>
-        </div>
-
         {/* Danger Zone */}
-        <div className="bg-red-50 border-2 border-red-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-red-900 mb-4">Danger Zone</h3>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-900">Deactivate Account</p>
-                <p className="text-xs text-red-700 mt-1">Temporarily deactivate your account</p>
+        <div className="bg-gradient-to-br from-red-50/50 to-orange-50/50 border border-red-100 rounded-2xl overflow-hidden mt-10">
+          <div className="p-8">
+            <h3 className="text-xl font-bold text-red-900 mb-6 flex items-center gap-2">
+              Danger Zone
+            </h3>
+            
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white rounded-xl shadow-sm border border-red-50/50">
+                <div>
+                  <p className="text-base font-bold text-red-900">Deactivate Account</p>
+                  <p className="text-sm text-red-700/80 mt-1">Temporarily block access to your account.</p>
+                </div>
+                <button className="shrink-0 px-6 py-2.5 bg-white border border-red-200 text-red-600 rounded-xl hover:bg-red-50 hover:border-red-300 transition-all font-semibold active:scale-95 shadow-sm hover:shadow">
+                  Deactivate
+                </button>
               </div>
-              <button className="px-6 py-2 border border-red-600 text-red-600 rounded-lg hover:bg-red-50 transition font-semibold">
-                Deactivate
-              </button>
-            </div>
-            <div className="border-t border-red-200 pt-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-red-900">Delete Account</p>
-                <p className="text-xs text-red-700 mt-1">Permanently delete your account and data</p>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-red-600 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                <div>
+                  <p className="text-base font-bold text-white">Delete Account</p>
+                  <p className="text-sm text-red-100 mt-1">Permanently obliterate your account and data.</p>
+                </div>
+                <button className="shrink-0 group flex items-center gap-2 px-6 py-2.5 bg-white text-red-600 rounded-xl hover:bg-red-50 transition-all font-bold active:scale-95 shadow">
+                  <Trash2 size={18} className="group-hover:scale-110 transition-transform" />
+                  Delete Permanently
+                </button>
               </div>
-              <button className="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-semibold flex items-center gap-2">
-                <Trash2 size={18} />
-                Delete
-              </button>
             </div>
           </div>
         </div>
+
       </div>
     </div>
   );

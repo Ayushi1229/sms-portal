@@ -1,8 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { verifyToken } from '@/lib/middleware/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
+import { canPerformAction, isAdmin, Role } from '@/lib/auth/permissions';
+import { CoreApiError, requirePermission } from '@/lib/services/week8-core';
+
+async function canAccessStudent(token: { id: string; roleId: number; departmentId: string | null }, studentId: string): Promise<boolean> {
+  if (token.id === studentId) {
+    return true;
+  }
+
+  if (isAdmin(token.roleId)) {
+    if (!token.departmentId) {
+      return true;
+    }
+
+    const sameDepartment = await prisma.user.findFirst({
+      where: {
+        id: studentId,
+        departmentId: token.departmentId,
+      },
+      select: { id: true },
+    });
+
+    return Boolean(sameDepartment);
+  }
+
+  if (token.roleId === Role.MENTOR) {
+    const assignment = await prisma.mentorAssignment.findFirst({
+      where: {
+        mentorId: token.id,
+        studentId,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    return Boolean(assignment);
+  }
+
+  return false;
+}
 
 /**
  * GET /api/students/[id]
@@ -15,10 +52,15 @@ export async function GET(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
+
+    if (!(await canAccessStudent(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const student = await prisma.studentProfile.findUnique({
       where: { userId: id },
       include: {
@@ -33,7 +75,7 @@ export async function GET(
     });
 
     if (!student) {
-      return apiError('Student not found', 404);
+      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
     }
 
     // Get assignments
@@ -61,18 +103,15 @@ export async function GET(
       take: 5,
     });
 
-    return NextResponse.json(
-      apiResponse({
-        ...student,
-        assignments,
-        goals,
-      }),
-      { status: 200 }
-    );
+    return NextResponse.json({ ...student, assignments, goals }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Get student error:', error);
-    return apiError('Failed to fetch student', 500);
+    return NextResponse.json({ error: 'Failed to fetch student' }, { status: 500 });
   }
 }
 
@@ -87,10 +126,16 @@ export async function PUT(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    requirePermission(token, 'EDIT_STUDENT');
+
     const { id } = await params;
+
+    if (!(await canAccessStudent(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
 
     const body = await request.json();
     const {
@@ -105,7 +150,22 @@ export async function PUT(
       riskLevel,
     } = body;
 
-    // Update user profile and student profile
+    const normalizedYear = yearOfStudy !== undefined && yearOfStudy !== '' ? Number(yearOfStudy) : undefined;
+    const normalizedGpa = gpa !== undefined && gpa !== '' ? Number(gpa) : undefined;
+    const normalizedAttendance = attendancePct !== undefined && attendancePct !== '' ? Number(attendancePct) : undefined;
+
+    if (normalizedYear !== undefined && (!Number.isInteger(normalizedYear) || normalizedYear < 1 || normalizedYear > 10)) {
+      return NextResponse.json({ error: 'yearOfStudy must be an integer between 1 and 10' }, { status: 400 });
+    }
+
+    if (normalizedGpa !== undefined && (Number.isNaN(normalizedGpa) || normalizedGpa < 0 || normalizedGpa > 10)) {
+      return NextResponse.json({ error: 'gpa must be between 0 and 10' }, { status: 400 });
+    }
+
+    if (normalizedAttendance !== undefined && (Number.isNaN(normalizedAttendance) || normalizedAttendance < 0 || normalizedAttendance > 100)) {
+      return NextResponse.json({ error: 'attendancePct must be between 0 and 100' }, { status: 400 });
+    }
+
     const updatedStudent = await prisma.user.update({
       where: { id },
       data: {
@@ -117,13 +177,23 @@ export async function PUT(
           },
         },
         studentProfile: {
-          update: {
+          upsert: {
+            create: {
+              rollNumber: rollNumber || `TEMP-${id.substring(0, 6)}`,
+              program,
+              yearOfStudy: normalizedYear,
+              gpa: normalizedGpa,
+              attendancePct: normalizedAttendance,
+              riskLevel: riskLevel || 'LOW',
+            },
+            update: {
             rollNumber,
             program,
-            yearOfStudy: yearOfStudy ? parseInt(yearOfStudy) : undefined,
-            gpa: gpa ? parseFloat(gpa) : undefined,
-            attendancePct: attendancePct ? parseFloat(attendancePct) : undefined,
+            yearOfStudy: normalizedYear,
+            gpa: normalizedGpa,
+            attendancePct: normalizedAttendance,
             riskLevel,
+            },
           },
         },
       },
@@ -134,17 +204,15 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(
-      apiResponse({
-        student: updatedStudent,
-        message: 'Student updated successfully',
-      }),
-      { status: 200 }
-    );
+    return NextResponse.json({ student: updatedStudent, message: 'Student updated successfully' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Update student error:', error);
-    return apiError('Failed to update student', 500);
+    return NextResponse.json({ error: 'Failed to update student' }, { status: 500 });
   }
 }
 
@@ -159,23 +227,41 @@ export async function DELETE(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    requirePermission(token, 'EDIT_STUDENT');
+
     const { id } = await params;
-    // Soft delete - set status to DISABLED
+
+    if (!(await canAccessStudent(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
+    const activeAssignments = await prisma.mentorAssignment.count({
+      where: {
+        studentId: id,
+        status: 'ACTIVE',
+      },
+    });
+
+    if (activeAssignments > 0) {
+      return NextResponse.json({ error: 'Cannot disable student with active assignments' }, { status: 400 });
+    }
+
     await prisma.user.update({
       where: { id },
       data: { status: 'DISABLED' },
     });
 
-    return NextResponse.json(
-      apiResponse({ message: 'Student deleted successfully' }),
-      { status: 200 }
-    );
+    return NextResponse.json({ message: 'Student deleted successfully' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Delete student error:', error);
-    return apiError('Failed to delete student', 500);
+    return NextResponse.json({ error: 'Failed to delete student' }, { status: 500 });
   }
 }

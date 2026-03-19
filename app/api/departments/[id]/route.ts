@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { apiResponse, apiError } from '@/lib/api/response';
 import { handleApiError } from '@/lib/api/error';
+import { verifyToken } from '@/lib/middleware/auth';
+import { canPerformAction, Role } from '@/lib/auth/permissions';
 
 /**
  * GET /api/departments/[id]
@@ -12,6 +14,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json(apiError('Unauthorized', 401), { status: 401 });
+    }
+
     const { id } = await params;
 
     const department = await prisma.department.findUnique({
@@ -36,6 +43,15 @@ export async function GET(
       );
     }
 
+    const canView =
+      token.roleId === Role.SUPER_ADMIN ||
+      token.roleId === Role.INSTITUTIONAL_ADMIN ||
+      token.departmentId === id;
+
+    if (!canView) {
+      return NextResponse.json(apiError('Forbidden: insufficient permissions', 403), { status: 403 });
+    }
+
     return NextResponse.json(apiResponse(department));
   } catch (error) {
     return handleApiError(error);
@@ -51,6 +67,15 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json(apiError('Unauthorized', 401), { status: 401 });
+    }
+
+    if (!canPerformAction(token.roleId, 'MANAGE_DEPARTMENTS')) {
+      return NextResponse.json(apiError('Forbidden: insufficient permissions', 403), { status: 403 });
+    }
+
     const { id } = await params;
     const body = await request.json();
     const { name, code } = body;
@@ -119,6 +144,15 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json(apiError('Unauthorized', 401), { status: 401 });
+    }
+
+    if (!canPerformAction(token.roleId, 'MANAGE_DEPARTMENTS')) {
+      return NextResponse.json(apiError('Forbidden: insufficient permissions', 403), { status: 403 });
+    }
+
     const { id } = await params;
 
     // Check if department exists

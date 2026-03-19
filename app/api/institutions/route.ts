@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { verifyToken } from '@/lib/middleware/auth';
+import { Role } from '@/lib/auth/permissions';
 
 /**
  * GET /api/institutions
@@ -7,6 +9,11 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET(request: NextRequest) {
   try {
+    const token = await verifyToken(request);
+    if (!token || token.roleId !== Role.SUPER_ADMIN) {
+      return NextResponse.json({ error: 'Unauthorized: Super Admin access required' }, { status: 401 });
+    }
+
     const institutions = await prisma.institution.findMany({
       include: {
         _count: {
@@ -57,6 +64,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    const token = await verifyToken(request);
+    if (!token || token.roleId !== Role.SUPER_ADMIN) {
+      return NextResponse.json({ error: 'Unauthorized: Super Admin access required' }, { status: 401 });
+    }
+
     const body = await request.json();
     const { name, code, address, contactEmail } = body;
 

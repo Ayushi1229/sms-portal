@@ -1,164 +1,256 @@
-﻿import type { Metadata } from "next";
-import { BarChart3, TrendingUp, Users, FileText, Download, PlusIcon } from "lucide-react";
+'use client';
 
-export const metadata: Metadata = {
-  title: "Reports Dashboard - SMMS",
-};
+import { useEffect, useState } from "react";
+import { 
+  BarChart3, 
+  TrendingUp, 
+  Users, 
+  FileText, 
+  Download, 
+  PlusIcon,
+  Calendar,
+  AlertCircle,
+  Clock,
+  ChevronRight,
+  Search,
+  CheckCircle2,
+  RefreshCcw,
+  Activity,
+  ArrowRight
+} from "lucide-react";
+import Link from "next/link";
+import { useAuth } from "@/lib/auth/AuthContext";
+import { Role } from "@/lib/auth/permissions";
+
+interface ReportStat {
+  mentors: number;
+  students: number;
+  alerts: number;
+  activeGoals: number;
+  sessions: number;
+  departmentName: string;
+}
+
+interface RecentActivity {
+  id: string;
+  student: string;
+  topic: string;
+  date: string;
+  status: string;
+}
 
 export default function ReportsPage() {
-  const reportCategories = [
+  const { user } = useAuth();
+  const [stats, setStats] = useState<ReportStat | null>(null);
+  const [activities, setActivities] = useState<RecentActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [statsRes, activityRes] = await Promise.all([
+        fetch('/api/dashboard/stats'),
+        fetch('/api/sessions?pageSize=5&paginated=true')
+      ]);
+
+      if (statsRes.ok) setStats(await statsRes.json());
+      if (activityRes.ok) {
+        const data = await activityRes.json();
+        setActivities(data.items || []);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isMentor = user?.roleId === Role.MENTOR;
+
+  const categories = [
     {
-      name: "Student Progress",
+      name: isMentor ? "My Goal Reports" : "Student Progress",
       icon: TrendingUp,
-      description: "Track student performance and achievements",
-      count: 12,
-      color: "bg-blue-100 text-blue-600",
+      description: "Monitor achievement of academic and behavioral goals",
+      value: stats?.activeGoals || 0,
+      label: "Active Goals",
+      color: "from-blue-500 to-cyan-400",
+      href: "/goals"
     },
     {
-      name: "Mentor Load",
-      icon: Users,
-      description: "Monitor mentor workload and capacity",
-      count: 8,
-      color: "bg-purple-100 text-purple-600",
+      name: "Attendance Logs",
+      icon: Clock,
+      description: "Complete history of mentoring sessions and participation",
+      value: stats?.sessions || 0,
+      label: "Total Sessions",
+      color: "from-emerald-500 to-teal-400",
+      href: "/sessions"
     },
     {
-      name: "Attendance",
-      icon: FileText,
-      description: "Session attendance and participation",
-      count: 15,
-      color: "bg-green-100 text-green-600",
+      name: "Risk Assessment",
+      icon: AlertCircle,
+      description: "Critical alerts and immediate intervention tracking",
+      value: stats?.alerts || 0,
+      label: "Open Alerts",
+      color: "from-rose-500 to-orange-400",
+      href: "/reports/risk-analysis"
     },
     {
-      name: "Risk Analysis",
+      name: isMentor ? "Activity Summary" : "Department Analytics",
       icon: BarChart3,
-      description: "Identify at-risk students and interventions",
-      count: 6,
-      color: "bg-orange-100 text-orange-600",
-    },
-  ];
-
-  const recentReports = [
-    {
-      id: 1,
-      title: "Q1 Student Progress Report",
-      category: "Student Progress",
-      date: "2024-01-14",
-      author: "Dr. Sarah Johnson",
-      format: "PDF",
-    },
-    {
-      id: 2,
-      title: "Mentor Capacity Analysis",
-      category: "Mentor Load",
-      date: "2024-01-12",
-      author: "Admin",
-      format: "Excel",
-    },
-    {
-      id: 3,
-      title: "December Attendance Summary",
-      category: "Attendance",
-      date: "2024-01-05",
-      author: "System",
-      format: "PDF",
-    },
-    {
-      id: 4,
-      title: "At-Risk Students Intervention Plan",
-      category: "Risk Analysis",
-      date: "2023-12-28",
-      author: "Dr. Ahmed Hassan",
-      format: "Word",
-    },
-  ];
-
-  const scheduledReports = [
-    { name: "Weekly Student Progress", schedule: "Every Monday 9:00 AM", status: "Active" },
-    { name: "Monthly Mentor Load", schedule: "1st of each month", status: "Active" },
-    { name: "Attendance Report", schedule: "Every Friday", status: "Active" },
+      description: "High-level overview of department-wide performance",
+      value: isMentor ? activities.length : stats?.students || 0,
+      label: isMentor ? "Recent Actions" : "Total Students",
+      color: "from-indigo-500 to-purple-400",
+      href: isMentor ? "/sessions" : "/reports/department-summary"
+    }
   ];
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Reports Dashboard</h1>
-        <button className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition">
-          <PlusIcon size={20} />
-          Generate New Report
-        </button>
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-4xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+            <BarChart3 className="text-blue-600 w-10 h-10" />
+            System Reports
+          </h1>
+          <p className="text-gray-500 mt-2 font-medium">
+            Real-time analytics for <span className="text-blue-600 font-bold">{stats?.departmentName || 'Your Department'}</span>
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={fetchData}
+            className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-blue-600 hover:shadow-lg transition-all"
+          >
+            <RefreshCcw size={20} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <Link href="/sessions">
+            <button className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3.5 rounded-2xl hover:bg-black transition shadow-xl shadow-gray-200 font-bold tracking-tight">
+              <Activity size={20} />
+              View Live Activity
+            </button>
+          </Link>
+        </div>
       </div>
 
-      {/* Report Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {reportCategories.map((cat) => {
+      {/* Primary Analytics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {categories.map((cat, idx) => {
           const Icon = cat.icon;
           return (
-            <div key={cat.name} className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition cursor-pointer">
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${cat.color}`}>
-                <Icon size={24} />
+            <Link href={cat.href} key={idx} className="group">
+              <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-gray-100 hover:shadow-2xl hover:translate-y-[-8px] transition-all duration-500 relative overflow-hidden h-full">
+                <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${cat.color} opacity-5 rounded-bl-full`}></div>
+                
+                <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white shadow-lg mb-6 group-hover:scale-110 transition-transform duration-500`}>
+                  <Icon size={28} />
+                </div>
+                
+                <h3 className="text-xl font-black text-gray-900 mb-2">{cat.name}</h3>
+                <p className="text-sm text-gray-400 font-medium leading-relaxed mb-6">{cat.description}</p>
+                
+                <div className="flex items-end justify-between mt-auto">
+                  <div>
+                    <p className="text-3xl font-black text-gray-900">{loading ? '...' : cat.value}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{cat.label}</p>
+                  </div>
+                  <div className="p-2 rounded-xl bg-gray-50 text-gray-300 group-hover:bg-blue-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} />
+                  </div>
+                </div>
               </div>
-              <h3 className="font-semibold text-gray-900 mb-1">{cat.name}</h3>
-              <p className="text-sm text-gray-600 mb-4">{cat.description}</p>
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-2xl font-bold text-gray-900">{cat.count}</p>
-                <p className="text-xs text-gray-600">available reports</p>
-              </div>
-            </div>
+            </Link>
           );
         })}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Reports */}
-        <div className="lg:col-span-2 bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Reports</h3>
-          <div className="space-y-4">
-            {recentReports.map((report) => (
-              <div key={report.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition">
-                <div className="flex-1">
-                  <h4 className="font-semibold text-gray-900">{report.title}</h4>
-                  <div className="flex items-center gap-4 mt-1 text-sm text-gray-600">
-                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs font-semibold">
-                      {report.category}
-                    </span>
-                    <span>{report.date}</span>
-                    <span>{report.author}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-xs font-semibold">
-                    {report.format}
-                  </span>
-                  <button className="text-blue-600 hover:text-blue-700">
-                    <Download size={20} />
-                  </button>
-                </div>
-              </div>
-            ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Recent Activity Log - REAL DATA */}
+        <div className="lg:col-span-2 space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+              <Activity className="text-blue-600" />
+              Live Activity Stream
+            </h3>
+            <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-3 py-1 rounded-full uppercase tracking-widest">Live Updates</span>
           </div>
-          <button className="w-full mt-6 text-blue-600 hover:underline text-sm font-semibold">
-            View All Reports →
-          </button>
+          
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden">
+            <div className="divide-y divide-gray-50">
+              {activities.length > 0 ? (
+                activities.map((activity) => (
+                  <div key={activity.id} className="group p-6 flex flex-col md:flex-row md:items-center justify-between hover:bg-blue-50/30 transition-all duration-300">
+                    <div className="flex items-center gap-5">
+                      <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center font-black text-blue-600">
+                        <Calendar size={20} />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight text-sm">
+                          {activity.student}
+                        </h4>
+                        <p className="text-xs text-gray-500 font-medium line-clamp-1">{activity.topic}</p>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] font-black text-gray-400 uppercase tracking-tighter">
+                          <span className="flex items-center gap-1"><Clock size={12} /> {activity.date}</span>
+                          <span className={`flex items-center gap-1 ${activity.status === 'COMPLETED' ? 'text-emerald-500' : 'text-blue-500'}`}>
+                            {activity.status}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 mt-4 md:mt-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Link href={`/sessions?search=${activity.student}`}>
+                        <button className="px-5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center gap-2">
+                          View Details
+                          <ArrowRight size={14} />
+                        </button>
+                      </Link>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="p-12 text-center text-gray-400 font-medium">
+                  No recent activity records found.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Scheduled Reports */}
-        <div className="bg-white rounded-lg shadow-md p-6 h-fit">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Scheduled Reports</h3>
-          <div className="space-y-3">
-            {scheduledReports.map((report) => (
-              <div key={report.name} className="border border-gray-200 rounded-lg p-3">
-                <h4 className="font-semibold text-gray-900 text-sm">{report.name}</h4>
-                <p className="text-xs text-gray-600 mt-1">{report.schedule}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  <span className="text-xs text-green-600 font-semibold">{report.status}</span>
+        {/* Feature Highlights / Guides */}
+        <div className="space-y-6">
+          <h3 className="text-xl font-black text-gray-900 flex items-center gap-2">
+            <CheckCircle2 className="text-emerald-600" />
+            System Status
+          </h3>
+          <div className="bg-emerald-600 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-emerald-100 h-full min-h-[300px] flex flex-col">
+            <div className="relative z-10 space-y-6 flex-1">
+              <div className="space-y-2">
+                <p className="text-emerald-100 text-xs font-black uppercase tracking-widest font-mono">Operations</p>
+                <h4 className="text-2xl font-bold leading-tight">All Reporting Engines Functional</h4>
+                <p className="text-emerald-100/60 text-sm font-medium">System is monitoring all {stats?.sessions || 0} session records and {stats?.activeGoals || 0} active goals.</p>
+              </div>
+              
+              <div className="bg-white/10 rounded-2xl p-4 flex items-center justify-between border border-white/10 mt-auto">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  <span className="text-xs font-bold">Real-time Data Active</span>
                 </div>
               </div>
-            ))}
+
+              <Link href="/dashboard" className="block w-full">
+                <button className="w-full bg-white text-emerald-600 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-emerald-50 transition-all shadow-lg">
+                  Return to Control Centre
+                </button>
+              </Link>
+            </div>
+            <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
           </div>
-          <button className="w-full mt-4 text-blue-600 hover:underline text-sm font-semibold">
-            Manage Schedules →
-          </button>
         </div>
       </div>
     </div>

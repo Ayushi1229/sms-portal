@@ -38,6 +38,8 @@ export async function POST(request: NextRequest) {
         role: true,
         department: true,
         profile: true,
+        mentorProfile: true,
+        studentProfile: true,
       },
     });
 
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         roleId: user.roleId,
         departmentId: user.departmentId,
+        institutionId: user.institutionId,
       },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }

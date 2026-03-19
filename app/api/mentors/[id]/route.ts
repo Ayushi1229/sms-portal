@@ -1,8 +1,45 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { verifyToken } from '@/lib/middleware/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
+import { canPerformAction, isAdmin, Role } from '@/lib/auth/permissions';
+import { CoreApiError, requirePermission } from '@/lib/services/week8-core';
+
+async function canAccessMentor(token: { id: string; roleId: number; departmentId: string | null }, mentorId: string): Promise<boolean> {
+  if (token.id === mentorId) {
+    return true;
+  }
+
+  if (isAdmin(token.roleId)) {
+    if (!token.departmentId) {
+      return true;
+    }
+
+    const sameDepartment = await prisma.user.findFirst({
+      where: {
+        id: mentorId,
+        departmentId: token.departmentId,
+      },
+      select: { id: true },
+    });
+
+    return Boolean(sameDepartment);
+  }
+
+  if (token.roleId === Role.STUDENT) {
+    const assignment = await prisma.mentorAssignment.findFirst({
+      where: {
+        mentorId,
+        studentId: token.id,
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    return Boolean(assignment);
+  }
+
+  return false;
+}
 
 /**
  * GET /api/mentors/[id]
@@ -15,10 +52,15 @@ export async function GET(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
+
+    if (!(await canAccessMentor(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const mentor = await prisma.mentorProfile.findUnique({
       where: { userId: id },
       include: {
@@ -33,7 +75,7 @@ export async function GET(
     });
 
     if (!mentor) {
-      return apiError('Mentor not found', 404);
+      return NextResponse.json({ error: 'Mentor not found' }, { status: 404 });
     }
 
     // Get assignments count
@@ -61,18 +103,15 @@ export async function GET(
       take: 10,
     });
 
-    return NextResponse.json(
-      apiResponse({
-        ...mentor,
-        assignmentsCount,
-        assignments,
-      }),
-      { status: 200 }
-    );
+    return NextResponse.json({ ...mentor, assignmentsCount, assignments }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Get mentor error:', error);
-    return apiError('Failed to fetch mentor', 500);
+    return NextResponse.json({ error: 'Failed to fetch mentor' }, { status: 500 });
   }
 }
 
@@ -87,10 +126,19 @@ export async function PUT(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    if (!canPerformAction(token.roleId, 'EDIT_MENTOR')) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
     }
 
     const { id } = await params;
+
+    if (!(await canAccessMentor(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const body = await request.json();
     const {
       firstName,
@@ -102,7 +150,11 @@ export async function PUT(
       availabilityStatus,
     } = body;
 
-    // Update user profile and mentor profile
+    const normalizedMaxMentees = maxMentees !== undefined && maxMentees !== '' ? Number(maxMentees) : undefined;
+    if (normalizedMaxMentees !== undefined && (!Number.isInteger(normalizedMaxMentees) || normalizedMaxMentees < 1 || normalizedMaxMentees > 200)) {
+      return NextResponse.json({ error: 'maxMentees must be an integer between 1 and 200' }, { status: 400 });
+    }
+
     const updatedMentor = await prisma.user.update({
       where: { id },
       data: {
@@ -114,11 +166,19 @@ export async function PUT(
           },
         },
         mentorProfile: {
-          update: {
+          upsert: {
+            create: {
+              designation,
+              specialization,
+              maxMentees: normalizedMaxMentees || 15,
+              availabilityStatus: availabilityStatus || 'AVAILABLE',
+            },
+            update: {
             designation,
             specialization,
-            maxMentees: maxMentees ? parseInt(maxMentees) : undefined,
+            maxMentees: normalizedMaxMentees,
             availabilityStatus,
+            },
           },
         },
       },
@@ -129,17 +189,15 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(
-      apiResponse({
-        mentor: updatedMentor,
-        message: 'Mentor updated successfully',
-      }),
-      { status: 200 }
-    );
+    return NextResponse.json({ mentor: updatedMentor, message: 'Mentor updated successfully' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Update mentor error:', error);
-    return apiError('Failed to update mentor', 500);
+    return NextResponse.json({ error: 'Failed to update mentor' }, { status: 500 });
   }
 }
 
@@ -154,11 +212,17 @@ export async function DELETE(
   try {
     const token = await verifyToken(request);
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    requirePermission(token, 'EDIT_MENTOR');
+
     const { id } = await params;
-    // Check if mentor has active assignments
+
+    if (!(await canAccessMentor(token, id))) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
     const activeAssignments = await prisma.mentorAssignment.count({
       where: {
         mentorId: id,
@@ -167,22 +231,22 @@ export async function DELETE(
     });
 
     if (activeAssignments > 0) {
-      return apiError('Cannot delete mentor with active assignments', 400);
+      return NextResponse.json({ error: 'Cannot delete mentor with active assignments' }, { status: 400 });
     }
 
-    // Soft delete
     await prisma.user.update({
       where: { id },
       data: { status: 'DISABLED' },
     });
 
-    return NextResponse.json(
-      apiResponse({ message: 'Mentor deleted successfully' }),
-      { status: 200 }
-    );
+    return NextResponse.json({ message: 'Mentor deleted successfully' }, { status: 200 });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Delete mentor error:', error);
-    return apiError('Failed to delete mentor', 500);
+    return NextResponse.json({ error: 'Failed to delete mentor' }, { status: 500 });
   }
 }

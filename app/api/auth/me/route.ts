@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import { verifyToken } from '@/lib/middleware/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
+import { apiResponse, apiErrorResponse } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -13,7 +12,7 @@ export async function GET(request: NextRequest) {
     const token = await verifyToken(request);
 
     if (!token) {
-      return apiError('Unauthorized', 401);
+      return apiErrorResponse('Unauthorized', 401);
     }
 
     const user = await prisma.user.findUnique({
@@ -22,11 +21,13 @@ export async function GET(request: NextRequest) {
         role: true,
         department: true,
         profile: true,
+        mentorProfile: true,
+        studentProfile: true,
       },
     });
 
     if (!user) {
-      return apiError('User not found', 404);
+      return apiErrorResponse('User not found', 404);
     }
 
     const { passwordHash, ...userWithoutPassword } = user;
@@ -37,6 +38,6 @@ export async function GET(request: NextRequest) {
     );
 
   } catch (error: any) {
-    return apiError('An error occurred', 500);
+    return apiErrorResponse('An error occurred', 500);
   }
 }

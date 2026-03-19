@@ -2,6 +2,23 @@ import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcrypt';
 import { verifyToken } from '@/lib/middleware/auth';
+import { canPerformAction, isAdmin, Role } from '@/lib/auth/permissions';
+import { CoreApiError, requirePermission } from '@/lib/services/week8-core';
+
+function assertUserAccess(requester: { id: string; roleId: number; departmentId: string | null }, target: { id: string; departmentId: string | null }) {
+  const isSelf = requester.id === target.id;
+  if (isSelf) {
+    return;
+  }
+
+  if (!isAdmin(requester.roleId)) {
+    throw new CoreApiError('Forbidden: insufficient permissions', 403);
+  }
+
+  if (requester.departmentId && target.departmentId !== requester.departmentId) {
+    throw new CoreApiError('Forbidden: cross-department access denied', 403);
+  }
+}
 
 // GET - Fetch a single user
 export async function GET(
@@ -9,6 +26,11 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     const { id } = await params;
 
     const user = await prisma.user.findUnique({
@@ -67,8 +89,14 @@ export async function GET(
       );
     }
 
+    assertUserAccess(token, { id: user.id, departmentId: user.departmentId });
+
     return NextResponse.json(user);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Error fetching user:', error);
     return NextResponse.json(
       { error: 'Failed to fetch user' },
@@ -83,30 +111,21 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Authenticate the user
     const token = await verifyToken(request);
     if (!token) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Please login to continue' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
-    const { email, firstName, lastName, password, roleId, departmentId, status } = body;
+    const { email, firstName, lastName, phone, title, bio, password, roleId, departmentId, status } = body;
 
-    // SECURITY: Only super admins (roleId: 1) can change user roles
-    if (roleId !== undefined && token.roleId !== 1) {
-      return NextResponse.json(
-        { error: 'Forbidden: Only super admins can change user roles' },
-        { status: 403 }
-      );
-    }
-
-    // Check if user exists
     const existingUser = await prisma.user.findUnique({
       where: { id },
+      select: {
+        id: true,
+        departmentId: true,
+      },
     });
 
     if (!existingUser) {
@@ -116,21 +135,53 @@ export async function PUT(
       );
     }
 
-    // Prepare update data
+    const isSelf = token.id === id;
+    if (!isSelf && !canPerformAction(token.roleId, 'EDIT_USER')) {
+      return NextResponse.json({ error: 'Forbidden: insufficient permissions' }, { status: 403 });
+    }
+
+    if (token.departmentId && existingUser.departmentId !== token.departmentId) {
+      return NextResponse.json({ error: 'Forbidden: cross-department access denied' }, { status: 403 });
+    }
+
+    if (roleId !== undefined && token.roleId !== Role.SUPER_ADMIN) {
+      return NextResponse.json({ error: 'Only super admins can change user roles' }, { status: 403 });
+    }
+
+    if (!isAdmin(token.roleId) && (departmentId !== undefined || status !== undefined)) {
+      return NextResponse.json({ error: 'Forbidden: only admins can change department or status' }, { status: 403 });
+    }
+
+    if (email) {
+      const existingByEmail = await prisma.user.findFirst({
+        where: {
+          email,
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+
+      if (existingByEmail) {
+        return NextResponse.json({ error: 'User with this email already exists' }, { status: 409 });
+      }
+    }
+
     const updateData: any = {};
     if (email) updateData.email = email;
-    if (roleId) updateData.roleId = roleId;
-    if (departmentId) updateData.departmentId = departmentId;
-    if (status) updateData.status = status;
+    if (roleId !== undefined) updateData.roleId = roleId;
+    if (departmentId !== undefined) updateData.departmentId = departmentId;
+    if (status !== undefined) updateData.status = status;
 
-    // Hash password if provided
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    const profileUpdateData: { firstName?: string; lastName?: string } = {};
+    const profileUpdateData: { firstName?: string; lastName?: string; phone?: string; title?: string; bio?: string } = {};
     if (firstName) profileUpdateData.firstName = firstName;
     if (lastName) profileUpdateData.lastName = lastName;
+    if (phone !== undefined) profileUpdateData.phone = phone;
+    if (title !== undefined) profileUpdateData.title = title;
+    if (bio !== undefined) profileUpdateData.bio = bio;
 
     const updatedUser = await prisma.user.update({
       where: { id },
@@ -138,7 +189,13 @@ export async function PUT(
         ...updateData,
         ...(Object.keys(profileUpdateData).length > 0 && {
           profile: {
-            update: profileUpdateData,
+            upsert: {
+              update: profileUpdateData,
+              create: {
+                firstName: profileUpdateData.firstName || '',
+                lastName: profileUpdateData.lastName || '',
+              },
+            },
           },
         }),
       },
@@ -161,7 +218,11 @@ export async function PUT(
     });
 
     return NextResponse.json(updatedUser);
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Error updating user:', error);
     return NextResponse.json(
       { error: 'Failed to update user' },
@@ -176,11 +237,25 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const token = await verifyToken(request);
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    requirePermission(token, 'DELETE_USER');
+
     const { id } = await params;
 
-    // Check if user exists
+    if (token.id === id) {
+      return NextResponse.json({ error: 'You cannot delete your own account' }, { status: 400 });
+    }
+
     const existingUser = await prisma.user.findUnique({
       where: { id },
+      select: {
+        id: true,
+        departmentId: true,
+      },
     });
 
     if (!existingUser) {
@@ -190,8 +265,11 @@ export async function DELETE(
       );
     }
 
+    if (token.departmentId && existingUser.departmentId !== token.departmentId) {
+      return NextResponse.json({ error: 'Forbidden: cross-department access denied' }, { status: 403 });
+    }
+
     await prisma.$transaction(async (tx) => {
-      // Remove records that block user deletion (onDelete: Restrict)
       await tx.sessionFeedback.deleteMany({
         where: {
           OR: [{ giverUserId: id }, { recipientUserId: id }],
@@ -216,7 +294,6 @@ export async function DELETE(
         },
       });
 
-      // Remove profiles explicitly (defensive; also cascades from user)
       await tx.mentorProfile.deleteMany({ where: { userId: id } });
       await tx.studentProfile.deleteMany({ where: { userId: id } });
       await tx.userProfile.deleteMany({ where: { userId: id } });
@@ -230,7 +307,11 @@ export async function DELETE(
       { message: 'User deleted successfully' },
       { status: 200 }
     );
-  } catch (error) {
+  } catch (error: unknown) {
+    if (error instanceof CoreApiError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
     console.error('Error deleting user:', error);
     return NextResponse.json(
       { error: 'Failed to delete user' },

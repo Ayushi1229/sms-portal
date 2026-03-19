@@ -30,14 +30,14 @@ export default function Navbar() {
     await logout();
   };
 
-  const userName = user?.profile 
+  const userName = user?.profile
     ? `${user.profile.firstName} ${user.profile.lastName}`
     : user?.email?.split("@")[0] || "User";
-  
+
   const userRole = user ? RoleNames[user.roleId] || "User" : "";
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-4 py-3">
+    <nav className="bg-white border-b border-gray-200 px-4 py-3 sticky top-0 z-50 shadow-sm">
       <div className="flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center space-x-4">
@@ -49,12 +49,11 @@ export default function Navbar() {
 
         {/* Right side actions */}
         <div className="flex items-center space-x-4">
-          <div className="text-sm text-gray-400">🔍 Search</div>
-          
+
           <Link href="/notifications" className="text-gray-600 hover:text-gray-900">
-            🔔 <span className="text-xs bg-red-500 text-white px-1 rounded-full">3</span>
+            🔔<span className="text-xs text-white px-1 rounded-full"></span>
           </Link>
-          
+
           {/* User Profile Dropdown */}
           {!isLoading && user ? (
             <div className="relative" ref={dropdownRef}>

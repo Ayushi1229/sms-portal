@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { apiResponse, apiError } from '@/lib/api/response';
+import { apiResponse, apiErrorResponse } from '@/lib/api/response';
 
 /**
  * POST /api/auth/refresh
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const refreshToken = request.cookies.get('refreshToken')?.value;
 
     if (!refreshToken) {
-      return apiError('Refresh token not found', 401);
+      return apiErrorResponse('Refresh token not found', 401);
     }
 
     // Verify refresh token
@@ -43,6 +43,6 @@ export async function POST(request: NextRequest) {
     return response;
 
   } catch (error: any) {
-    return apiError('Invalid or expired refresh token', 401);
+    return apiErrorResponse('Invalid or expired refresh token', 401);
   }
 }

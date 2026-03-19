@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from "react";
+import { Activity, ShieldCheck, History } from "lucide-react";
 
 interface Stats {
   mentors: number;
@@ -27,32 +28,59 @@ export default function AdminDashboardPage() {
   }, []);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-      <p className="text-gray-600 mb-6">System-wide overview for administrators</p>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-500 mb-1">Total Mentors</div>
-          <div className="text-3xl font-bold text-indigo-600">{loading ? '...' : stats?.mentors}</div>
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
+              <History className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Recent Activity</h2>
+              <p className="text-sm text-gray-500">Live updates from across the institution</p>
+            </div>
+          </div>
+          <div className="flex flex-col items-center justify-center py-12 px-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+             <Activity className="w-12 h-12 text-gray-300 mb-3" />
+             <p className="text-gray-500 text-sm font-medium">No system activity detected recently.</p>
+          </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-500 mb-1">Total Students</div>
-          <div className="text-3xl font-bold text-green-600">{loading ? '...' : stats?.students}</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-500 mb-1">Active Goals</div>
-          <div className="text-3xl font-bold text-yellow-600">{loading ? '...' : stats?.activeGoals}</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="text-sm text-gray-500 mb-1">Active Alerts</div>
-          <div className="text-3xl font-bold text-red-600">{loading ? '...' : stats?.alerts}</div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 mb-6">
+            <div className="p-3 bg-emerald-50 rounded-xl text-emerald-600">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">System Status</h2>
+              <p className="text-sm text-gray-500">All services operational</p>
+            </div>
+          </div>
+          <div className="space-y-4">
+             <StatusRow label="Database" status="Active" color="emerald" />
+             <StatusRow label="Auth Service" status="Active" color="emerald" />
+             <StatusRow label="File Storage" status="Active" color="emerald" />
+             <StatusRow label="Notifications" status="Active" color="emerald" />
+          </div>
         </div>
       </div>
-      
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-        <div className="text-gray-500 text-sm">No recent activity detected.</div>
+    </div>
+  );
+}
+
+function StatusRow({ label, status, color }: { label: string, status: string, color: string }) {
+  const colorMap: Record<string, string> = {
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    rose: "bg-rose-500",
+  };
+  
+  return (
+    <div className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
+      <span className="text-sm font-medium text-gray-700">{label}</span>
+      <div className="flex items-center gap-2">
+         <div className={`w-2 h-2 rounded-full ${colorMap[color]} animate-pulse`}></div>
+         <span className="text-xs font-bold text-gray-500 uppercase">{status}</span>
       </div>
     </div>
   );

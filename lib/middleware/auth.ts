@@ -6,6 +6,7 @@ export interface DecodedToken {
   email: string;
   roleId: number;
   departmentId: string | null;
+  institutionId: string | null;
   iat: number;
   exp: number;
 }
@@ -30,8 +31,44 @@ export async function verifyToken(request: NextRequest): Promise<DecodedToken | 
     
     const { payload } = await jwtVerify(token, secret);
 
-    console.log("verifyToken - Token decoded successfully for user:", payload.email);
-    return payload as DecodedToken;
+    const id = typeof payload.id === 'string' ? payload.id : null;
+    const email = typeof payload.email === 'string' ? payload.email : null;
+    const roleIdValue = payload.roleId;
+    const roleId =
+      typeof roleIdValue === 'number'
+        ? roleIdValue
+        : typeof roleIdValue === 'string' && roleIdValue.trim() !== ''
+          ? Number(roleIdValue)
+          : NaN;
+    const departmentIdRaw = payload.departmentId;
+    const departmentId =
+      departmentIdRaw === null || typeof departmentIdRaw === 'string'
+        ? departmentIdRaw
+        : null;
+    
+    const institutionIdRaw = payload.institutionId;
+    const institutionId =
+      institutionIdRaw === null || typeof institutionIdRaw === 'string'
+        ? institutionIdRaw
+        : null;
+    const iat = typeof payload.iat === 'number' ? payload.iat : Math.floor(Date.now() / 1000);
+    const exp = typeof payload.exp === 'number' ? payload.exp : iat;
+
+    if (!id || !email || Number.isNaN(roleId)) {
+      console.log('verifyToken - Missing required token claims');
+      return null;
+    }
+
+    console.log('verifyToken - Token decoded successfully for user:', email);
+    return {
+      id,
+      email,
+      roleId,
+      departmentId,
+      institutionId,
+      iat,
+      exp,
+    };
   } catch (error) {
     console.log("verifyToken - Token verification failed:", error);
     return null;

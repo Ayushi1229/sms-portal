@@ -21,14 +21,8 @@ export default function LoginForm() {
   }, [searchParams]);
 
   const getRoleDashboard = (roleId: number): string => {
-    const dashboardMap: Record<number, string> = {
-      1: "/dashboard/admin", // super_admin
-      2: "/dashboard/admin", // institutional_admin
-      3: "/dashboard/department", // department_admin
-      4: "/dashboard/mentor", // mentor
-      5: "/dashboard/student", // student
-    };
-    return dashboardMap[roleId] || "/dashboard";
+    // All roles now use the unified /dashboard route which handles role-specific content
+    return "/dashboard";
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {

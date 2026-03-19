@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { registerSchema } from '@/lib/validations/auth';
-import { apiResponse, apiError } from '@/lib/api/response';
+import { apiResponse, apiError, apiErrorResponse } from '@/lib/api/response';
 import { prisma } from '@/lib/prisma';
 
 /**
@@ -22,7 +21,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return apiError('An account with this email already exists', 409);
+      return apiErrorResponse('An account with this email already exists', 409);
     }
 
     // Hash password (4 rounds - minimum for instant login performance)
