@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { verifyToken } from "@/lib/middleware/auth";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  console.log("Middleware checking path:", pathname);
-  
+
+  console.log("Proxy checking path:", pathname);
+
   // Public routes (no auth required)
   const publicRoutes = [
     "/login",
@@ -17,10 +17,10 @@ export async function middleware(request: NextRequest) {
     "/unauthorized",
     "/auth-status",
   ];
-  
+
   // Check if current path is public
-  const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route));
-  
+  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+
   // Allow public routes
   if (isPublicRoute) {
     console.log("Public route, allowing access");
@@ -29,9 +29,9 @@ export async function middleware(request: NextRequest) {
 
   // Verify authentication token
   const token = await verifyToken(request);
-  
+
   console.log("Token verification result:", token ? "Valid token" : "No token");
-  
+
   // Redirect to login if not authenticated
   if (!token) {
     console.log("No token, redirecting to login");
