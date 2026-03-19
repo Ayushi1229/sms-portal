@@ -22,6 +22,38 @@ interface Department {
   name: string;
 }
 
+const normalizeStudents = (response: any): Student[] => {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.data?.students)) {
+    return response.data.students;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  return [];
+};
+
+const normalizeDepartments = (response: any): Department[] => {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.data?.departments)) {
+    return response.data.departments;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  return [];
+};
+
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -38,12 +70,21 @@ export default function StudentsPage() {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/students');
+      const response = await fetch('/api/students', { credentials: 'same-origin' });
       if (!response.ok) {
-        throw new Error('Failed to fetch students');
+        let message = `Failed to fetch students (HTTP ${response.status})`;
+        try {
+          const errorBody = await response.json();
+          if (typeof errorBody?.error === 'string' && errorBody.error.trim()) {
+            message = errorBody.error;
+          }
+        } catch {
+          // Ignore parse errors and keep status-based fallback message.
+        }
+        throw new Error(message);
       }
       const data = await response.json();
-      setStudents(data);
+      setStudents(normalizeStudents(data));
     } catch (err) {
       console.error('Error fetching students:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
@@ -54,10 +95,10 @@ export default function StudentsPage() {
 
   const fetchDepartments = async () => {
     try {
-      const response = await fetch('/api/departments');
+      const response = await fetch('/api/departments', { credentials: 'same-origin' });
       if (response.ok) {
         const data = await response.json();
-        setDepartments(data);
+        setDepartments(normalizeDepartments(data));
       }
     } catch (err) {
       console.error('Error fetching departments:', err);

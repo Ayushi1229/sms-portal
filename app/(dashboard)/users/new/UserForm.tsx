@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 interface Role {
@@ -14,8 +14,25 @@ interface Department {
   name: string;
 }
 
+const normalizeDepartments = (response: any): Department[] => {
+  if (Array.isArray(response)) {
+    return response;
+  }
+
+  if (Array.isArray(response?.data?.departments)) {
+    return response.data.departments;
+  }
+
+  if (Array.isArray(response?.data)) {
+    return response.data;
+  }
+
+  return [];
+};
+
 export default function UserForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
@@ -29,6 +46,8 @@ export default function UserForm() {
     roleId: '',
     departmentId: '',
   });
+
+  const requestedRole = (searchParams.get('role') || '').toLowerCase();
 
   useEffect(() => {
     // Fetch roles and departments
@@ -47,15 +66,11 @@ export default function UserForm() {
         const deptResponse = await fetch('/api/departments?limit=100');
         if (deptResponse.ok) {
           const deptData = await deptResponse.json();
-          // Handle the API response structure: { success: true, data: { departments: [...], pagination: {...} } }
-          if (deptData.success && deptData.data && Array.isArray(deptData.data.departments)) {
-            setDepartments(deptData.data.departments);
-          } else if (Array.isArray(deptData.data)) {
-            // Fallback in case structure is different
-            setDepartments(deptData.data);
-          } else {
+          const parsedDepartments = normalizeDepartments(deptData);
+          setDepartments(parsedDepartments);
+
+          if (parsedDepartments.length === 0) {
             console.warn('Unexpected departments API response structure:', deptData);
-            setDepartments([]);
           }
         } else {
           console.error('Failed to fetch departments');
@@ -69,6 +84,22 @@ export default function UserForm() {
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    if (!requestedRole || roles.length === 0) {
+      return;
+    }
+
+    const matchedRole = roles.find((role) => role.name.toLowerCase() === requestedRole);
+    if (!matchedRole) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      roleId: String(matchedRole.id),
+    }));
+  }, [requestedRole, roles]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
