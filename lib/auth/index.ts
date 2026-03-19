@@ -51,7 +51,6 @@ export const ROLES = {
 
 // Re-export role-based utilities
 export * from './permissions';
-export * from './ProtectedComponent';
 
 /**
  * Role names mapping
